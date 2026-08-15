@@ -32,6 +32,332 @@ The frontend opens the camera in the browser, tracks hand landmarks, and can det
 
 Important: there is no universal trained sign-language model included by default. For Server AI mode, you collect your own gesture data and train your own model.
 
+## Complete Working Flow
+
+This section explains what happens from opening the website to getting text/voice output.
+
+### 1. User opens the website
+
+When you open:
+
+```text
+http://127.0.0.1:5000
+```
+
+Flask runs from:
+
+```text
+backend/app.py
+```
+
+and serves the frontend file:
+
+```text
+frontend/index.html
+```
+
+So the visible website is HTML/CSS/JavaScript, but it is loaded through the Python Flask server.
+
+### 2. Browser asks for camera permission
+
+The frontend uses the browser camera. When the user clicks the camera/start button, Chrome or Edge asks for camera permission.
+
+If permission is allowed, the video stream appears inside the website.
+
+### 3. MediaPipe tracks the hand
+
+The frontend loads MediaPipe Hands in `frontend/index.html`.
+
+MediaPipe looks at each camera frame and detects hand landmark points. For one hand, MediaPipe gives 21 points:
+
+```text
+landmark 0  = wrist
+landmark 4  = thumb tip
+landmark 8  = index finger tip
+landmark 12 = middle finger tip
+landmark 16 = ring finger tip
+landmark 20 = pinky finger tip
+```
+
+Each point has:
+
+```text
+x, y, z
+```
+
+These points describe the hand shape and finger positions.
+
+### 4. Browser mode detects gestures without backend AI
+
+In Browser mode, the frontend uses JavaScript rules inside `frontend/index.html`.
+
+Example idea:
+
+- If thumb/index/middle/ring/pinky are open or closed in a certain pattern, classify a sign.
+- If two hands are visible, compare distance and position between both hands.
+- For some motion signs like wave/J/Z, track fingertip movement over a short time.
+
+This mode works immediately because it does not need a trained TensorFlow model.
+
+### 5. Server AI mode sends landmarks to Flask
+
+In Server AI mode, the frontend does not directly decide the final sign. Instead, it sends the hand landmarks to Flask.
+
+The frontend calls:
+
+```text
+POST /api/predict
+```
+
+with data like:
+
+```json
+{
+  "landmarks": [
+    [x, y, z],
+    [x, y, z],
+    "... 21 points total"
+  ]
+}
+```
+
+The backend receives this request in:
+
+```text
+backend/app.py
+```
+
+### 6. Backend normalizes the landmarks
+
+Raw camera landmarks can change if:
+
+- hand is closer or farther from camera
+- hand is slightly moved left/right
+- user has bigger/smaller hands
+
+So backend uses:
+
+```text
+backend/utils.py
+```
+
+to normalize the 21 hand points. Normalization makes the data more consistent before prediction.
+
+The same normalization is used during:
+
+- data collection
+- model training
+- live prediction
+
+This is important because the model should see data in the same format during training and real use.
+
+### 7. TensorFlow model predicts the sign
+
+After normalization, Flask loads the trained model from:
+
+```text
+backend/model/gesture_model.h5
+```
+
+and labels from:
+
+```text
+backend/model/labels.json
+```
+
+Then TensorFlow predicts the most likely sign and returns:
+
+```json
+{
+  "label": "hello",
+  "confidence": 0.93
+}
+```
+
+The frontend receives this result and shows the detected word on the website.
+
+### 8. Text and voice output
+
+After a gesture is detected, the frontend updates:
+
+- current detected sign
+- transcript/conversation text
+- history
+- confidence/statistics
+
+For voice output, the app can use:
+
+- Browser Web Speech API for live speech in the frontend
+- `/api/speak` backend endpoint using gTTS for MP3 audio
+
+The browser speech method is usually faster for live use.
+
+## Training Flow Explained
+
+Training is only needed for Server AI mode.
+
+### Step A: Choose gestures
+
+The gesture list is inside:
+
+```text
+backend/collect_data.py
+```
+
+Look for:
+
+```python
+GESTURES = [
+    "come here", "hello", "thanks", "yes", "no", "please",
+    "sorry", "help", "love", "stop", "ok",
+]
+```
+
+You can edit this list to train your own signs.
+
+### Step B: Collect hand landmark samples
+
+Run:
+
+```powershell
+.\collect_data.bat
+```
+
+This opens a webcam window. When you record a gesture, the script:
+
+1. reads camera frames
+2. detects hand landmarks using MediaPipe
+3. normalizes the landmarks
+4. saves the label and features into:
+
+```text
+backend/data/landmarks.csv
+```
+
+Each row in the CSV means:
+
+```text
+gesture label + normalized hand landmark numbers
+```
+
+### Step C: Train TensorFlow model
+
+Run:
+
+```powershell
+.\train_model.bat
+```
+
+This script reads:
+
+```text
+backend/data/landmarks.csv
+```
+
+Then it trains a small TensorFlow classifier and saves:
+
+```text
+backend/model/gesture_model.h5
+backend/model/labels.json
+```
+
+### Step D: Use trained model in website
+
+Run:
+
+```powershell
+.\start_server.bat
+```
+
+Open:
+
+```text
+http://127.0.0.1:5000
+```
+
+Select Server AI mode. Now the website sends live landmarks to the backend, and the backend predicts using your trained model.
+
+## Local vs Render Flow
+
+### Local VS Code flow
+
+Local machine is used for:
+
+- opening camera
+- collecting training data
+- training model
+- testing the app
+
+Commands:
+
+```powershell
+cd backend
+.\setup_windows.bat
+.\start_server.bat
+```
+
+For training:
+
+```powershell
+.\collect_data.bat
+.\train_model.bat
+```
+
+### Render flow
+
+Render is used for:
+
+- hosting the Flask backend
+- serving `frontend/index.html`
+- running `/api/health`, `/api/predict`, and `/api/speak`
+
+Render is not used for:
+
+- collecting webcam training data
+- training from your laptop camera
+
+Reason: Render server cannot access your laptop webcam. Training must be done locally, then trained model files can be pushed to GitHub if needed.
+
+## Full Request Flow Diagram
+
+```text
+User opens Render/local URL
+        |
+        v
+Flask backend serves frontend/index.html
+        |
+        v
+Browser opens camera after permission
+        |
+        v
+MediaPipe detects 21 hand landmarks
+        |
+        v
+Frontend mode selected?
+        |
+        +-- Browser mode
+        |       |
+        |       v
+        |   JavaScript rules classify gesture
+        |
+        +-- Server AI mode
+                |
+                v
+            POST /api/predict
+                |
+                v
+            Flask normalizes landmarks
+                |
+                v
+            TensorFlow model predicts label
+                |
+                v
+            Backend returns label + confidence
+        |
+        v
+Frontend shows text, updates history, speaks output
+```
+
 ## Project Structure
 
 ```text
