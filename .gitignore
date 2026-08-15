@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+backend/venv/
+
+# Local config and secrets
+.env
+.env.*
+!.env.example
+
+# Editors and OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Test/build/cache output
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Generated training data and model artifacts
+backend/data/*
+!backend/data/.gitkeep
+backend/model/*
+!backend/model/.gitkeep
+
+# Logs and temporary files
+*.log
+tmp/
+temp/

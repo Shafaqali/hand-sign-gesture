@@ -1,0 +1,1568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SignSpeak AI — Words &amp; Alphabet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<style>
+  :root{
+    --ink:#161A23;
+    --paper:#F6F1E7;
+    --paper-line:#E4DCC8;
+    --viewfinder:#0D1016;
+    --viewfinder-grid:#232935;
+    --teal:#2FBFA0;
+    --coral:#E8663F;
+    --muted:#9096A5;
+    --muted-paper:#8A8270;
+    --danger:#E85C5C;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--ink);
+    color:#EDEFF4;
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{
+    max-width:1280px;
+    margin:0 auto;
+    padding:28px 20px 60px;
+  }
+  header{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom:22px;
+    flex-wrap:wrap;
+  }
+  .brand-eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--teal);
+    margin:0 0 6px;
+  }
+  h1{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:clamp(28px,4vw,40px);
+    margin:0;
+    letter-spacing:-0.01em;
+  }
+  .sub{
+    color:var(--muted);
+    font-size:13.5px;
+    max-width:480px;
+    margin-top:6px;
+    line-height:1.5;
+  }
+  .theme-toggle{
+    display:flex;
+    gap:8px;
+    background:#1C212C;
+    padding:4px;
+    border-radius:10px;
+    border:1px solid #2A3040;
+  }
+  .theme-toggle button{
+    border:none;
+    background:transparent;
+    color:var(--muted);
+    padding:7px 14px;
+    border-radius:7px;
+    font-size:12.5px;
+    font-family:'Inter',sans-serif;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .theme-toggle button.active{background:var(--teal);color:#04211B;}
+
+  .grid{
+    display:grid;
+    grid-template-columns:1.05fr 0.95fr;
+    gap:18px;
+  }
+  @media (max-width:900px){ .grid{grid-template-columns:1fr;} }
+
+  .panel{
+    border-radius:18px;
+    overflow:hidden;
+  }
+
+  /* VIEWFINDER */
+  .viewfinder{
+    background:var(--viewfinder);
+    border:1px solid #1E2431;
+    display:flex;
+    flex-direction:column;
+  }
+  .vf-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:14px 16px 10px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:#6C7689;
+    letter-spacing:.06em;
+  }
+  .vf-head .dot{
+    display:inline-block;width:7px;height:7px;border-radius:50%;
+    background:var(--muted);margin-right:6px;
+  }
+  .vf-head .dot.live{background:#3ADE7A;box-shadow:0 0 0 3px rgba(58,222,122,.15);}
+  .stage{
+    position:relative;
+    aspect-ratio:4/3;
+    background:
+      linear-gradient(var(--viewfinder-grid) 1px,transparent 1px) 0 0/100% 33.3%,
+      linear-gradient(90deg,var(--viewfinder-grid) 1px,transparent 1px) 0 0/33.3% 100%,
+      #05070A;
+    margin:0 12px;
+    border-radius:12px;
+    overflow:hidden;
+  }
+  video, canvas.overlay{
+    position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;
+  }
+  video{transform:scaleX(-1);}
+  canvas.overlay{transform:scaleX(-1);}
+  .stage-empty{
+    position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:12px;color:#4A5164;text-align:center;padding:24px;
+  }
+  .stage-empty button{
+    background:var(--teal);color:#04211B;border:none;padding:11px 22px;border-radius:9px;
+    font-weight:600;font-size:13.5px;cursor:pointer;font-family:'Inter',sans-serif;
+  }
+  .hud{
+    position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;
+    font-family:'JetBrains Mono',monospace;font-size:11px;color:#8FF7D6;pointer-events:none;
+    text-shadow:0 1px 3px rgba(0,0,0,.8);
+  }
+  .hud .badge{background:rgba(13,16,22,.55);border:1px solid rgba(143,247,214,.25);padding:3px 8px;border-radius:6px;}
+
+  .vf-controls{
+    display:flex;gap:8px;flex-wrap:wrap;padding:14px 16px 16px;
+  }
+  .vf-controls button, .vf-controls select{
+    background:#171C26;border:1px solid #2A3040;color:#D7DBE4;
+    padding:8px 12px;border-radius:9px;font-size:12.5px;cursor:pointer;font-family:'Inter',sans-serif;
+  }
+  .vf-controls button:hover{border-color:var(--teal);}
+  .vf-controls button.danger{border-color:#4A2A2A;color:#F0A0A0;}
+
+  .conf-meter{
+    display:flex;align-items:center;gap:2px;padding:0 16px 14px;
+  }
+  .conf-meter .bar{flex:1;height:5px;background:#1B212C;border-radius:3px;overflow:hidden;}
+  .conf-meter .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--coral),var(--teal));width:0%;transition:width .15s;}
+  .conf-meter span{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);width:44px;text-align:right;}
+
+  /* TRANSCRIPT (paper) */
+  .transcript{
+    background:var(--paper);
+    color:var(--ink);
+    border:1px solid #D8CFB6;
+    display:flex;flex-direction:column;
+  }
+  .t-head{
+    padding:16px 18px 8px;
+    display:flex;justify-content:space-between;align-items:baseline;
+  }
+  .t-head h2{
+    font-family:'Fraunces',serif;font-size:18px;margin:0;font-weight:600;
+  }
+  .t-head span{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--muted-paper);}
+  .sentence-box{
+    margin:6px 18px 10px;
+    min-height:120px;
+    background:#FBF8F0;
+    border:1px dashed #CBBF9E;
+    border-radius:12px;
+    padding:16px 18px;
+    font-family:'Fraunces',serif;
+    font-size:22px;
+    line-height:1.5;
+    color:#2A2F1E;
+  }
+  .sentence-box .placeholder{color:#B7AD8F;font-style:italic;font-size:16px;}
+  .word-chip{
+    display:inline-block;position:relative;padding:0 2px;
+  }
+  .word-chip::after{
+    content:'';position:absolute;left:2px;right:2px;bottom:1px;height:5px;background:rgba(232,102,63,.28);z-index:-1;border-radius:2px;
+  }
+  .t-actions{display:flex;gap:8px;padding:0 18px 14px;flex-wrap:wrap;}
+  .t-actions button{
+    background:#EFE7D2;border:1px solid #D8CFB6;color:#4B4531;
+    padding:7px 13px;border-radius:8px;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;font-weight:500;
+  }
+  .t-actions button:hover{background:#E4D9BC;}
+  .t-actions button.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);}
+
+  .divider{height:1px;background:var(--paper-line);margin:2px 18px;}
+
+  .controls-section{padding:12px 18px;}
+  .controls-section h3{
+    font-family:'JetBrains Mono',monospace;text-transform:uppercase;font-size:10.5px;
+    letter-spacing:.1em;color:var(--muted-paper);margin:0 0 10px;
+  }
+  .row{display:flex;gap:10px;align-items:center;margin-bottom:9px;flex-wrap:wrap;}
+  .row label{font-size:12.5px;color:#5C563F;width:88px;flex-shrink:0;}
+  .row select, .row input[type=range]{flex:1;min-width:100px;}
+  select{
+    background:#FBF8F0;border:1px solid #D8CFB6;border-radius:7px;padding:6px 8px;font-size:12.5px;color:var(--ink);
+    font-family:'Inter',sans-serif;
+  }
+  input[type=range]{accent-color:var(--coral);}
+  .mute-row{display:flex;gap:8px;}
+  .mute-row button{
+    background:#FBF8F0;border:1px solid #D8CFB6;border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer;
+  }
+  .mute-row button.active{background:var(--coral);color:#fff;border-color:var(--coral);}
+
+  .translation-line{
+    padding:0 18px 14px;font-family:'Fraunces',serif;font-style:italic;font-size:15px;color:#6B6448;min-height:20px;
+  }
+  .natural-line{
+    padding:0 18px 6px;font-family:'Inter',sans-serif;font-size:13px;color:#4B4531;min-height:18px;
+  }
+  .natural-line b{
+    font-family:'JetBrains Mono',monospace;font-weight:500;font-size:10px;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--muted-paper);margin-right:6px;
+  }
+  .convo-line{
+    background:#171C26;border:1px solid #232936;border-radius:10px;padding:10px 12px;margin-bottom:8px;
+  }
+  .convo-text{font-size:13.5px;color:#EDEFF4;line-height:1.4;}
+  .convo-meta{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-top:4px;}
+  body.light .convo-line{background:#F6F1E7;border-color:#E4DCC8;}
+  body.light .convo-text{color:var(--ink);}
+  body.light .convo-meta{color:#8A8270;}
+
+  /* HISTORY + DASHBOARD */
+  .bottom-grid{
+    display:grid;grid-template-columns:1fr 1.2fr 1fr;gap:18px;margin-top:18px;
+  }
+  @media (max-width:1100px){ .bottom-grid{grid-template-columns:1fr 1fr;} }
+  @media (max-width:640px){ .bottom-grid{grid-template-columns:1fr;} }
+  .card{
+    background:#1C212C;border:1px solid #2A3040;border-radius:16px;padding:18px;
+  }
+  .card h3{
+    font-family:'JetBrains Mono',monospace;text-transform:uppercase;font-size:11px;letter-spacing:.1em;
+    color:var(--muted);margin:0 0 14px;
+  }
+  .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  .stat{
+    background:#171C26;border-radius:11px;padding:12px 10px;text-align:left;
+  }
+  .stat .num{font-family:'Fraunces',serif;font-size:24px;font-weight:600;color:var(--teal);}
+  .stat .lbl{font-size:10.5px;color:var(--muted);margin-top:2px;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th{
+    text-align:left;color:var(--muted);font-weight:500;font-size:10.5px;text-transform:uppercase;
+    letter-spacing:.06em;padding:6px 6px;border-bottom:1px solid #2A3040;
+  }
+  td{padding:7px 6px;border-bottom:1px solid #232936;color:#D7DBE4;}
+  td.conf{font-family:'JetBrains Mono',monospace;color:var(--teal);}
+  .hist-empty{color:var(--muted);font-size:12.5px;padding:20px 0;text-align:center;}
+  .hist-actions{display:flex;gap:8px;margin-top:12px;}
+  .hist-actions button{
+    background:#171C26;border:1px solid #2A3040;color:#D7DBE4;padding:7px 12px;border-radius:8px;
+    font-size:11.5px;cursor:pointer;
+  }
+  .note{
+    margin-top:18px;font-size:11.5px;color:#6C7689;line-height:1.6;background:#171C26;
+    border:1px solid #232936;border-radius:12px;padding:14px 16px;
+  }
+  .note b{color:#9BA4B5;}
+
+  /* LIGHT THEME OVERRIDE */
+  body.light{background:#EFEAE0;}
+  body.light .card{background:#fff;border-color:#E4DCC8;}
+  body.light .card h3{color:#8A8270;}
+  body.light .stat{background:#F6F1E7;}
+  body.light .stat .lbl{color:#8A8270;}
+  body.light td{color:#3A3628;border-bottom-color:#EAE2CC;}
+  body.light th{color:#8A8270;border-bottom-color:#E4DCC8;}
+  body.light .note{background:#fff;border-color:#E4DCC8;color:#8A8270;}
+  body.light .note b{color:#4B4531;}
+  body.light .hist-actions button{background:#F6F1E7;border-color:#E4DCC8;color:#4B4531;}
+  body.light h1, body.light .sub{color:var(--ink);}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div>
+      <p class="brand-eyebrow">● Camera-based · Runs entirely in this browser tab</p>
+      <h1>SignSpeak AI</h1>
+      <p class="sub">Live hand tracking turns hand shapes into text, then reads them aloud. Switch between <b>Word Signs</b> (whole-word gestures like Hello, Thank you, Help) and <b>Alphabet</b> (A–Z fingerspelling) on the right. Working demo — see the note at the bottom for what a full production build adds.</p>
+    </div>
+    <div class="theme-toggle">
+      <button id="theme-dark" class="active">Dark</button>
+      <button id="theme-light">Light</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- VIEWFINDER -->
+    <div class="panel viewfinder">
+      <div class="vf-head">
+        <span><span class="dot" id="live-dot"></span>VIEWFINDER</span>
+        <span id="fps-counter">-- FPS</span>
+      </div>
+      <div class="stage" id="stage">
+        <video id="video" playsinline muted></video>
+        <canvas class="overlay" id="overlay"></canvas>
+        <div class="hud" id="hud" style="display:none;">
+          <span class="badge" id="hands-badge">0 hands</span>
+          <span class="badge" id="gesture-badge">—</span>
+        </div>
+        <div class="stage-empty" id="stage-empty">
+          <span style="font-size:28px;">✋</span>
+          <p style="max-width:260px;margin:0;">Turn on your camera to start tracking hand landmarks in real time.</p>
+          <button id="start-cam">Enable camera</button>
+        </div>
+      </div>
+      <div class="conf-meter">
+        <span>Confidence</span>
+        <div class="bar"><i id="conf-bar"></i></div>
+        <span id="conf-val">0%</span>
+      </div>
+      <div class="vf-controls">
+        <button id="switch-cam">↺ Switch camera</button>
+        <select id="mode-select">
+          <option value="live">Live detection</option>
+          <option value="paused">Paused</option>
+        </select>
+        <select id="engine-select" title="Choose which classifier decides the sign">
+          <option value="browser">Engine: Browser (rules)</option>
+          <option value="server">Engine: Server AI (TensorFlow)</option>
+        </select>
+        <button id="stop-cam" class="danger">Stop camera</button>
+      </div>
+      <div id="engine-status" style="padding:0 16px 12px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--muted);"></div>
+    </div>
+
+    <!-- TRANSCRIPT -->
+    <div class="panel transcript">
+      <div class="t-head">
+        <h2>Transcript</h2>
+        <div class="theme-toggle" id="mode-tabs">
+          <button id="mode-word-btn" class="active">Word signs</button>
+          <button id="mode-alpha-btn">Alphabet</button>
+        </div>
+      </div>
+
+      <!-- WORD-SIGN MODE -->
+      <div id="words-panel">
+        <div class="t-head" style="padding-top:2px;">
+          <span></span>
+          <span id="word-count">0 words</span>
+        </div>
+        <div class="sentence-box" id="sentence-box">
+          <span class="placeholder">Detected signs will appear here as words…</span>
+        </div>
+        <div class="natural-line" id="natural-line"></div>
+        <div class="translation-line" id="translation-line"></div>
+        <div class="t-actions">
+          <button id="undo-btn">Undo</button>
+          <button id="delete-last-btn">Delete last</button>
+          <button id="clear-btn">Clear</button>
+          <button id="copy-btn" class="primary">Copy text</button>
+        </div>
+      </div>
+
+      <!-- ALPHABET / FINGERSPELLING MODE -->
+      <div id="alphabet-panel" style="display:none;">
+        <div class="t-head" style="padding-top:2px;">
+          <span></span>
+          <span id="letter-count">0 letters</span>
+        </div>
+        <div class="sentence-box" id="alphabet-box">
+          <span class="placeholder">Fingerspelled letters will appear here — hold each letter steady for a moment…</span>
+        </div>
+        <div class="natural-line" id="alpha-hint">Hold a letter shape steady to register it. A short pause auto-adds a space; a longer pause finalizes the line below.</div>
+        <div class="t-actions">
+          <button id="space-btn">Space</button>
+          <button id="backspace-btn">Backspace</button>
+          <button id="clear-alpha-btn">Clear</button>
+          <button id="copy-alpha-btn" class="primary">Copy text</button>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="controls-section">
+        <h3>Speech</h3>
+        <div class="row">
+          <label>Voice</label>
+          <select id="voice-select"></select>
+        </div>
+        <div class="row">
+          <label>Language</label>
+          <select id="lang-select">
+            <option value="en">English</option>
+            <option value="hi">Hindi (translation only)</option>
+            <option value="mr">Marathi (translation only)</option>
+            <option value="gu">Gujarati (translation only)</option>
+            <option value="ur">Urdu (translation only)</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Speed</label>
+          <input type="range" id="rate-range" min="0.5" max="1.8" step="0.1" value="1">
+        </div>
+        <div class="row">
+          <label>Volume</label>
+          <input type="range" id="vol-range" min="0" max="1" step="0.1" value="1">
+        </div>
+        <div class="row">
+          <label>Playback</label>
+          <div class="mute-row">
+            <button id="mute-btn">🔊 Speak on detect</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-grid">
+    <div class="card">
+      <h3>Conversation</h3>
+      <div id="conversation-wrap">
+        <div class="hist-empty">Finished sentences will appear here after a short pause between signs.</div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Detection History</h3>
+      <div id="history-wrap">
+        <div class="hist-empty">No gestures detected yet — history will populate as you sign.</div>
+      </div>
+      <div class="hist-actions">
+        <button id="export-csv">⬇ Export CSV</button>
+        <button id="clear-history">Clear history</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Dashboard</h3>
+      <div class="stat-grid">
+        <div class="stat"><div class="num" id="stat-total">0</div><div class="lbl">Total gestures</div></div>
+        <div class="stat"><div class="num" id="stat-today">0</div><div class="lbl">Today</div></div>
+        <div class="stat"><div class="num" id="stat-avgconf">0%</div><div class="lbl">Avg. confidence</div></div>
+        <div class="stat"><div class="num" id="stat-most">—</div><div class="lbl">Most used sign</div></div>
+        <div class="stat"><div class="num" id="stat-hands">0</div><div class="lbl">Hands tracked now</div></div>
+        <div class="stat"><div class="num" id="stat-fps">0</div><div class="lbl">Camera FPS</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>What's real here:</b> live MediaPipe hand-landmark tracking (21 points/hand, both hands) feeding two independent rule-based geometric classifiers. <b>Word signs</b> mode recognizes 13 whole-word signs — including two-hand compounds (Help, Together) and one motion-tracked sign (Bye, via wrist-trajectory wave detection) — and turns a run of them into a punctuated sentence through a phrase-template engine. <b>Alphabet</b> mode fingerspells 16 ASL letters (A, B, C, D, F, I, J, L, O, S, U, V, W, X, Y, Z) from static handshapes plus two motion-traced letters (J, Z), with a hold-time + rolling-buffer confirmation layer so a shape has to be held steadily before it registers, auto-spacing between words on a short pause, and line finalization into the Conversation log on a longer pause. Both modes share Web Speech API TTS, detection history, CSV export, and a fixed-vocabulary translation table.<br><br>
+    <b>What's simplified:</b> both modes are geometry-over-landmarks classifiers, not trained models — they recognize curated, clearly distinct handshapes rather than general ASL/ISL. Alphabet mode only covers 16 of the 26 letters; E, G, H, K, M, N, P, Q, R, and T are left out because they depend on fine thumb/finger overlap or wrist rotation that's unreliable to detect from 2D landmarks with simple geometric rules. J and Z rely on a coarse fingertip-trajectory heuristic (a handful of direction reversals in a short time window), not real motion-sequence modelling, so they'll be the least reliable letters. The "natural sentence" text in Word signs mode is a hand-written phrase table over 13 known signs, not grammar inference. Reliable, general sign-language recognition — the full alphabet, facial-grammar markers, body posture, and regional dialects — needs a trained deep-learning model on a labeled landmark dataset, which isn't something that can be fabricated without real training data. A production version would swap both classifiers for that trained model and add the FastAPI + MongoDB + JWT backend for accounts, cross-device history, and the admin panel — happy to scaffold that backend next if useful.
+  </div>
+
+</div>
+
+<script>
+const GESTURE_WORDS = {
+  hello: "Hello", stop: "Stop", yes: "Yes", no: "No",
+  come: "Come", good: "Good", friend: "Friend", sorry: "Sorry",
+  love: "Love", ok: "Ok", help: "Help", together: "Together", bye: "Bye"
+};
+const TRANSLATIONS = {
+  Hello:{hi:"नमस्ते",mr:"नमस्कार",gu:"નમસ્તે",ur:"ہیلو"},
+  Stop:{hi:"रुको",mr:"थांबा",gu:"રોકો",ur:"رک جاؤ"},
+  Yes:{hi:"हाँ",mr:"होय",gu:"હા",ur:"جی ہاں"},
+  No:{hi:"नहीं",mr:"नाही",gu:"ના",ur:"نہیں"},
+  Come:{hi:"आओ",mr:"या",gu:"આવો",ur:"آؤ"},
+  Good:{hi:"अच्छा",mr:"चांगले",gu:"સારું",ur:"اچھا"},
+  Friend:{hi:"दोस्त",mr:"मित्र",gu:"મિત્ર",ur:"دوست"},
+  Sorry:{hi:"माफ़ करें",mr:"माफ करा",gu:"માફ કરશો",ur:"معاف کیجیے"},
+  Love:{hi:"प्यार",mr:"प्रेम",gu:"પ્રેમ",ur:"محبت"},
+  Ok:{hi:"ठीक है",mr:"ठीक आहे",gu:"ઠીક છે",ur:"ٹھیک ہے"},
+  Help:{hi:"मदद",mr:"मदत",gu:"મદદ",ur:"مدد"},
+  Together:{hi:"साथ",mr:"एकत्र",gu:"સાથે",ur:"ساتھ"},
+  Bye:{hi:"अलविदा",mr:"बाय",gu:"આવજો",ur:"خدا حافظ"}
+};
+
+// ---------- SENTENCE ENGINE (v2) ----------
+// Sign-language "gloss" (the raw word order a signer produces) does not map
+// 1:1 onto spoken-language grammar, and a real signer doesn't always sign
+// concepts in strict English word order. So instead of matching an exact
+// ordered sequence (v1), this engine:
+//   1. Collapses a sign repeated back-to-back into one emphasis clause
+//      (e.g. Yes Yes -> "Yes, yes -- absolutely!").
+//   2. Looks up 3-sign and then 2-sign *combinations* regardless of the
+//      order they were signed in (bag-of-signs match, via a sorted key),
+//      since two-sign compounds like Friend+Hello mean the same thing
+//      whichever sign came first.
+//   3. Anything left over falls back to a single-sign template.
+//   4. Fuses runs of adjacent leftover single-sign clauses into one fused
+//      sentence with commas/"and" instead of a string of short, choppy
+//      sentences, while phrase/repeat clauses stay as their own sentence.
+// This is still a hand-written phrase table, not real grammar inference --
+// it covers combinations of the 13 known signs, not open-ended language.
+
+const TRIPLE_PHRASES = {
+  "friend+good+hello": "Hello, my good friend!",
+  "friend+help+together": "Let's help each other, my friend.",
+  "friend+love+together": "I love being together with you, my friend.",
+  "good+help+yes": "Yes, that help was really good.",
+  "bye+friend+hello": "Hello and goodbye, my friend!",
+  "friend+sorry+together": "I'm sorry, my friend -- let's stay together."
+};
+const PAIR_PHRASES = {
+  "friend+hello": "Hello, my friend!",
+  "friend+love": "I love my friend.",
+  "friend+help": "I need your help, my friend.",
+  "friend+sorry": "I'm sorry, my friend.",
+  "friend+good": "You are such a good friend.",
+  "come+together": "Let's come together.",
+  "help+together": "Let's help each other.",
+  "good+together": "It's good that we're together.",
+  "good+yes": "Yes, that's really good.",
+  "no+sorry": "No, and I'm sorry about that.",
+  "help+stop": "Stop! I need help!",
+  "bye+hello": "Hello, and goodbye!",
+  "love+ok": "It's okay -- I love you.",
+  "good+ok": "Okay, that sounds good.",
+  "no+stop": "No, please stop.",
+  "friend+together": "We're together, my friend.",
+  "friend+yes": "Yes, my friend.",
+  "come+help": "Come and help me.",
+  "love+together": "Let's stay together, my love.",
+  "bye+love": "I love you -- goodbye for now.",
+  "good+hello": "Hello! It's good to see you.",
+  "no+ok": "No, that's not okay.",
+  "friend+ok": "Okay, my friend.",
+  "friend+stop": "Stop it, my friend."
+};
+const REPEAT_TEXT = {
+  Yes: "Yes, yes -- absolutely!",
+  No: "No, no, not at all.",
+  Good: "Good, so good!",
+  Stop: "Stop, stop right now!",
+  Help: "Help! I really need help!",
+  Love: "I love you, I really do."
+};
+const WORD_TEMPLATE = {
+  Hello:"Hello!", Stop:"Stop.", Yes:"Yes.", No:"No.",
+  Come:"Please come here.", Good:"That's good.", Friend:"You are my friend.",
+  Sorry:"I'm sorry.", Love:"I love you.", Ok:"Okay.", Help:"I need help.",
+  Together:"Let's stay together.", Bye:"Goodbye!"
+};
+
+function sortedKey(arr){ return arr.map(w => w.toLowerCase()).sort().join('+'); }
+
+// Turn ["Yes","Yes","Friend"] into [{type:'repeat',word:'Yes'}, {type:'single',word:'Friend'}]
+function compressRepeats(words){
+  const tokens = [];
+  let i = 0;
+  while(i < words.length){
+    let j = i;
+    while(j + 1 < words.length && words[j+1] === words[i]) j++;
+    tokens.push(j > i ? {type:'repeat', word:words[i]} : {type:'single', word:words[i]});
+    i = j + 1;
+  }
+  return tokens;
+}
+
+function repeatText(word){
+  return REPEAT_TEXT[word] || `${word}, ${word.toLowerCase()}!`;
+}
+
+// Splits trailing .!? off a clause so several leftover clauses can be fused
+// into one sentence sharing a single end-mark instead of each having its own.
+function stripPunct(s){
+  const m = s.match(/([.!?]+)\s*$/);
+  return m ? { base: s.slice(0, -m[1].length), punct: m[1][0] } : { base:s, punct:'.' };
+}
+
+function fuseClauses(clauses){
+  const sentences = [];
+  let run = [];
+  const flushRun = () => {
+    if(run.length === 0) return;
+    if(run.length === 1){
+      sentences.push(run[0].text);
+    } else {
+      const parts = run.map(c => stripPunct(c.text));
+      let punct = '.';
+      if(parts.some(p => p.punct === '!')) punct = '!';
+      else if(parts.some(p => p.punct === '?')) punct = '?';
+      const bases = parts.map(p => p.base.trim());
+      const fused = bases.map((b,idx) => idx===0 ? b : b.charAt(0).toLowerCase()+b.slice(1));
+      const joined = fused.length === 2
+        ? fused[0] + ', and ' + fused[1]
+        : fused.slice(0,-1).join(', ') + ', and ' + fused[fused.length-1];
+      sentences.push(joined + punct);
+    }
+    run = [];
+  };
+  clauses.forEach(c => {
+    if(c.simple) run.push(c);
+    else { flushRun(); sentences.push(c.text); }
+  });
+  flushRun();
+  let out = sentences.join(' ').trim();
+  return out.charAt(0).toUpperCase() + out.slice(1);
+}
+
+function toNaturalSentence(words){
+  if(words.length === 0) return "";
+  const tokens = compressRepeats(words);
+  const clauses = [];
+  let i = 0;
+  while(i < tokens.length){
+    const tok = tokens[i];
+    if(tok.type === 'repeat'){
+      clauses.push({ text: repeatText(tok.word), simple:false });
+      i++;
+      continue;
+    }
+    if(i+2 < tokens.length && tokens[i+1].type === 'single' && tokens[i+2].type === 'single'){
+      const key = sortedKey([tok.word, tokens[i+1].word, tokens[i+2].word]);
+      if(TRIPLE_PHRASES[key]){
+        clauses.push({ text: TRIPLE_PHRASES[key], simple:false });
+        i += 3;
+        continue;
+      }
+    }
+    if(i+1 < tokens.length && tokens[i+1].type === 'single'){
+      const key = sortedKey([tok.word, tokens[i+1].word]);
+      if(PAIR_PHRASES[key]){
+        clauses.push({ text: PAIR_PHRASES[key], simple:false });
+        i += 2;
+        continue;
+      }
+    }
+    clauses.push({ text: WORD_TEMPLATE[tok.word] || (tok.word + "."), simple:true });
+    i++;
+  }
+  return fuseClauses(clauses);
+}
+
+// ---------- BACKEND (TensorFlow) ENGINE INTEGRATION ----------
+const BACKEND_URL = ''; // same-origin (Flask serves this file) — leave blank
+let detectionEngine = 'browser';   // 'browser' | 'server'
+let backendGestures = [];          // labels the trained model actually knows
+let lastBackendCallAt = 0;
+const BACKEND_THROTTLE_MS = 350;   // don't hammer the API every frame
+let backendBusy = false;
+
+async function checkBackendHealth(){
+  const statusEl = document.getElementById('engine-status');
+  try{
+    const res = await fetch(`${BACKEND_URL}/api/health`);
+    const data = await res.json();
+    if(data.model_loaded){
+      backendGestures = data.gestures || [];
+      statusEl.textContent = `Server model ready — knows: ${backendGestures.join(', ')}`;
+      statusEl.style.color = '#3ADE7A';
+    } else {
+      statusEl.textContent = 'Server reachable but no trained model yet (run collect_data.py + train_model.py).';
+      statusEl.style.color = 'var(--coral)';
+    }
+  }catch(err){
+    statusEl.textContent = 'Backend not reachable — start it with "python app.py". Using browser engine.';
+    statusEl.style.color = 'var(--muted)';
+  }
+}
+
+// Sends the 21 raw MediaPipe landmarks for ONE hand to the Flask backend and
+// returns {key, conf} in the same shape the local classifiers use, so the
+// rest of the pipeline (hold-to-confirm, speak, transcript) doesn't care
+// which engine produced the guess.
+async function backendPredict(handLandmarks){
+  if(backendBusy) return null;
+  const now = performance.now();
+  if(now - lastBackendCallAt < BACKEND_THROTTLE_MS) return null;
+  lastBackendCallAt = now;
+  backendBusy = true;
+  try{
+    const landmarks = handLandmarks.map(p => [p.x, p.y, p.z]);
+    const res = await fetch(`${BACKEND_URL}/api/predict`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ landmarks })
+    });
+    const data = await res.json();
+    if(data.error || !data.label) return null;
+    return { key: data.label, conf: data.confidence };
+  }catch(err){
+    return null;
+  }finally{
+    backendBusy = false;
+  }
+}
+
+document.getElementById('engine-select').addEventListener('change', (e) => {
+  detectionEngine = e.target.value;
+  candidateBuffer = [];
+  alphaBuffer = [];
+  if(detectionEngine === 'server') checkBackendHealth();
+});
+checkBackendHealth();
+
+let sentence = [];
+let history = [];
+let camera = null;
+let hands = null;
+let currentFacing = "user";
+let speakOnDetect = true;
+let lastSpokenWord = null;
+let lastSpokenTime = 0;
+let fpsLast = performance.now();
+let fpsFrames = 0;
+// Temporal smoothing: a gesture must appear consistently across a short
+// rolling window before it's "confirmed" — this is what makes a rule-based
+// classifier feel stable instead of flickering between guesses every frame.
+let candidateBuffer = []; // {key, conf, t}
+const HOLD_MS = 380;
+const MIN_AGREEMENT = 0.6;
+// Wave-motion buffer for the "bye" sign (open hand moving side to side)
+let waveBuffer = []; // {x, t}
+const WAVE_WINDOW_MS = 900;
+// Pause-based sentence finalization: after this many ms with no confirmed
+// sign, the current gloss buffer is closed off into a finished sentence.
+const SENTENCE_PAUSE_MS = 2500;
+let lastWordTime = 0;
+let sentenceTimer = null;
+let conversationLog = [];
+
+// ---------- ALPHABET MODE STATE ----------
+let appMode = 'words'; // 'words' | 'alphabet'
+let spellText = ''; // accumulated fingerspelled letters/spaces for the current line
+let alphaBuffer = []; // hold-confirmation buffer, mirrors candidateBuffer but for letters
+const ALPHA_HOLD_MS = 420; // letters get a slightly longer hold than words — less transient
+let lastSpokenLetter = null;
+let lastSpokenLetterTime = 0;
+let lastLetterTime = 0;
+const WORD_GAP_MS = 1300; // pause long enough to auto-insert a space between fingerspelled words
+let letterLineTimer = null;
+// Motion buffers for the two traced letters (J, Z) — same coarse trajectory
+// approach as the "Bye" wave detector in word-sign mode, just on a different
+// fingertip and shape. These are the least reliable letters for exactly that reason.
+let jMotionBuffer = []; // {x,y,t} on the pinky tip, while in an I-handshape
+let zMotionBuffer = []; // {x,t} on the index tip, while pointing
+
+const videoEl = document.getElementById('video');
+const overlay = document.getElementById('overlay');
+const octx = overlay.getContext('2d');
+const stageEmpty = document.getElementById('stage-empty');
+const hud = document.getElementById('hud');
+const liveDot = document.getElementById('live-dot');
+const confBar = document.getElementById('conf-bar');
+const confVal = document.getElementById('conf-val');
+const gestureBadge = document.getElementById('gesture-badge');
+const handsBadge = document.getElementById('hands-badge');
+const fpsCounter = document.getElementById('fps-counter');
+const statFps = document.getElementById('stat-fps');
+const statHands = document.getElementById('stat-hands');
+
+// ---------- THEME ----------
+document.getElementById('theme-dark').onclick = () => setTheme('dark');
+document.getElementById('theme-light').onclick = () => setTheme('light');
+function setTheme(t){
+  document.body.classList.toggle('light', t==='light');
+  document.getElementById('theme-dark').classList.toggle('active', t==='dark');
+  document.getElementById('theme-light').classList.toggle('active', t==='light');
+}
+
+// ---------- SPEECH ----------
+let voices = [];
+function loadVoices(){
+  voices = window.speechSynthesis.getVoices();
+  const sel = document.getElementById('voice-select');
+  sel.innerHTML = '';
+  if(voices.length === 0){
+    const opt = document.createElement('option');
+    opt.textContent = 'Default voice';
+    sel.appendChild(opt);
+    return;
+  }
+  voices.forEach((v,i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `${v.name} (${v.lang})`;
+    sel.appendChild(opt);
+  });
+}
+if('speechSynthesis' in window){
+  loadVoices();
+  window.speechSynthesis.onvoiceschanged = loadVoices;
+}
+function speak(text){
+  if(!speakOnDetect || !('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  const sel = document.getElementById('voice-select');
+  if(voices[sel.value]) u.voice = voices[sel.value];
+  u.rate = parseFloat(document.getElementById('rate-range').value);
+  u.volume = parseFloat(document.getElementById('vol-range').value);
+  window.speechSynthesis.speak(u);
+}
+document.getElementById('mute-btn').onclick = function(){
+  speakOnDetect = !speakOnDetect;
+  this.textContent = speakOnDetect ? '🔊 Speak on detect' : '🔇 Muted';
+  this.classList.toggle('active', !speakOnDetect);
+};
+
+// ---------- TRANSLATION ----------
+document.getElementById('lang-select').onchange = renderSentence;
+
+// ---------- SENTENCE BUILDER ----------
+function renderSentence(){
+  const box = document.getElementById('sentence-box');
+  const lang = document.getElementById('lang-select').value;
+  document.getElementById('word-count').textContent = sentence.length + (sentence.length===1?' word':' words');
+  const nLine = document.getElementById('natural-line');
+  if(sentence.length === 0){
+    box.innerHTML = '<span class="placeholder">Detected signs will appear here as words…</span>';
+    document.getElementById('translation-line').textContent = '';
+    nLine.innerHTML = '';
+    return;
+  }
+  box.innerHTML = sentence.map(w => `<span class="word-chip">${w}</span>`).join(' ');
+  nLine.innerHTML = '<b>Sentence</b>' + toNaturalSentence(sentence);
+  const tLine = document.getElementById('translation-line');
+  if(lang === 'en'){ tLine.textContent = ''; }
+  else {
+    const translated = sentence.map(w => (TRANSLATIONS[w] && TRANSLATIONS[w][lang]) || w).join(' ');
+    tLine.textContent = translated;
+  }
+}
+function addWord(word){
+  sentence.push(word);
+  renderSentence();
+}
+document.getElementById('undo-btn').onclick = () => { sentence.pop(); renderSentence(); };
+document.getElementById('delete-last-btn').onclick = () => { sentence.pop(); renderSentence(); };
+document.getElementById('clear-btn').onclick = () => {
+  sentence = [];
+  if(sentenceTimer) clearTimeout(sentenceTimer);
+  renderSentence();
+};
+document.getElementById('copy-btn').onclick = () => {
+  navigator.clipboard.writeText(sentence.join(' ')).catch(()=>{});
+  const btn = document.getElementById('copy-btn');
+  const old = btn.textContent; btn.textContent = 'Copied ✓';
+  setTimeout(()=>btn.textContent = old, 1200);
+};
+
+// ---------- ALPHABET (FINGERSPELLING) BUILDER ----------
+function renderAlphabet(){
+  const box = document.getElementById('alphabet-box');
+  const letters = spellText.replace(/ /g, '').length;
+  document.getElementById('letter-count').textContent = letters + (letters===1?' letter':' letters');
+  if(!spellText){
+    box.innerHTML = '<span class="placeholder">Fingerspelled letters will appear here — hold each letter steady for a moment…</span>';
+    return;
+  }
+  box.innerHTML = spellText.split('').map(ch => ch === ' '
+    ? '&nbsp;&nbsp;'
+    : `<span class="word-chip">${ch}</span>`).join('');
+}
+function addLetter(letter){
+  const nowT = Date.now();
+  // A pause longer than WORD_GAP_MS since the last letter reads as "new word".
+  if(spellText.length && !spellText.endsWith(' ') && (nowT - lastLetterTime) > WORD_GAP_MS){
+    spellText += ' ';
+  }
+  spellText += letter;
+  lastLetterTime = nowT;
+  renderAlphabet();
+}
+// A longer pause than that finalizes the whole line into the Conversation log,
+// the same way a pause between signs finalizes a sentence in Word signs mode.
+function armLetterLineTimer(){
+  lastLetterTime = Date.now();
+  if(letterLineTimer) clearTimeout(letterLineTimer);
+  letterLineTimer = setTimeout(() => {
+    if(Date.now() - lastLetterTime >= SENTENCE_PAUSE_MS - 50) finalizeSpelling();
+  }, SENTENCE_PAUSE_MS);
+}
+function finalizeSpelling(){
+  const text = spellText.trim();
+  if(!text) return;
+  conversationLog.unshift({ gloss: text.split(' '), text: text, time: new Date() });
+  spellText = '';
+  renderAlphabet();
+  renderConversationLog();
+  if(speakOnDetect && 'speechSynthesis' in window){
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    const sel = document.getElementById('voice-select');
+    if(voices[sel.value]) u.voice = voices[sel.value];
+    u.rate = parseFloat(document.getElementById('rate-range').value);
+    u.volume = parseFloat(document.getElementById('vol-range').value);
+    window.speechSynthesis.speak(u);
+  }
+}
+document.getElementById('space-btn').onclick = () => {
+  if(spellText.length && !spellText.endsWith(' ')) spellText += ' ';
+  renderAlphabet();
+};
+document.getElementById('backspace-btn').onclick = () => {
+  spellText = spellText.slice(0, -1);
+  renderAlphabet();
+};
+document.getElementById('clear-alpha-btn').onclick = () => {
+  spellText = '';
+  if(letterLineTimer) clearTimeout(letterLineTimer);
+  renderAlphabet();
+};
+document.getElementById('copy-alpha-btn').onclick = () => {
+  navigator.clipboard.writeText(spellText.trim()).catch(()=>{});
+  const btn = document.getElementById('copy-alpha-btn');
+  const old = btn.textContent; btn.textContent = 'Copied ✓';
+  setTimeout(()=>btn.textContent = old, 1200);
+};
+
+// ---------- MODE SWITCHING ----------
+function setAppMode(m){
+  appMode = m;
+  document.getElementById('mode-word-btn').classList.toggle('active', m === 'words');
+  document.getElementById('mode-alpha-btn').classList.toggle('active', m === 'alphabet');
+  document.getElementById('words-panel').style.display = m === 'words' ? '' : 'none';
+  document.getElementById('alphabet-panel').style.display = m === 'alphabet' ? '' : 'none';
+  // Reset in-flight recognition state so nothing bleeds across modes.
+  candidateBuffer = [];
+  alphaBuffer = [];
+  gestureBadge.textContent = '—';
+  confBar.style.width = '0%';
+  confVal.textContent = '0%';
+}
+document.getElementById('mode-word-btn').onclick = () => setAppMode('words');
+document.getElementById('mode-alpha-btn').onclick = () => setAppMode('alphabet');
+
+// ---------- HISTORY / DASHBOARD ----------
+function logDetection(word, confidence){
+  const entry = { word, confidence, time: new Date() };
+  history.unshift(entry);
+  renderHistory();
+  renderDashboard();
+}
+function renderHistory(){
+  const wrap = document.getElementById('history-wrap');
+  if(history.length === 0){
+    wrap.innerHTML = '<div class="hist-empty">No gestures detected yet — history will populate as you sign.</div>';
+    return;
+  }
+  const rows = history.slice(0,8).map(e => `
+    <tr>
+      <td>${e.word}</td>
+      <td class="conf">${Math.round(e.confidence*100)}%</td>
+      <td>${e.time.toLocaleTimeString()}</td>
+    </tr>`).join('');
+  wrap.innerHTML = `<table><thead><tr><th>Sign</th><th>Confidence</th><th>Time</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function renderDashboard(){
+  document.getElementById('stat-total').textContent = history.length;
+  const today = new Date().toDateString();
+  document.getElementById('stat-today').textContent = history.filter(e => e.time.toDateString() === today).length;
+  const avg = history.length ? history.reduce((s,e)=>s+e.confidence,0)/history.length : 0;
+  document.getElementById('stat-avgconf').textContent = Math.round(avg*100) + '%';
+  if(history.length){
+    const counts = {};
+    history.forEach(e => counts[e.word] = (counts[e.word]||0)+1);
+    const most = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0];
+    document.getElementById('stat-most').textContent = most;
+  }
+}
+document.getElementById('export-csv').onclick = () => {
+  if(history.length === 0) return;
+  const rows = [['Sign','Confidence','Timestamp'], ...history.map(e => [e.word, (e.confidence*100).toFixed(0)+'%', e.time.toISOString()])];
+  const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'signspeak-history.csv'; a.click();
+  URL.revokeObjectURL(url);
+};
+document.getElementById('clear-history').onclick = () => { history = []; renderHistory(); renderDashboard(); };
+
+// ---------- GESTURE CLASSIFIER (rule-based, geometric) ----------
+// Landmarks indices: 0 wrist, 4 thumb tip, 8 index tip, 12 middle tip, 16 ring tip, 20 pinky tip
+// 5,9,13,17 = corresponding MCP (knuckle) joints
+function fingerExtended(lm, tip, pip, mcp){
+  // rough check: tip further from wrist than pip, and roughly straight
+  const wrist = lm[0];
+  const dTip = dist(lm[tip], wrist);
+  const dPip = dist(lm[pip], wrist);
+  return dTip > dPip * 1.15;
+}
+function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y, (a.z||0)-(b.z||0)); }
+
+function classifyGesture(lm, handedness){
+  const thumbUp = lm[4].y < lm[3].y - 0.02 && Math.abs(lm[4].x - lm[2].x) < 0.12;
+  const thumbDown = lm[4].y > lm[3].y + 0.02;
+  const index = fingerExtended(lm, 8, 6, 5);
+  const middle = fingerExtended(lm, 12, 10, 9);
+  const ring = fingerExtended(lm, 16, 14, 13);
+  const pinky = fingerExtended(lm, 20, 18, 17);
+  const extendedCount = [index, middle, ring, pinky].filter(Boolean).length;
+
+  // Open palm: all 4 fingers extended and spread
+  if(extendedCount === 4){
+    const spread = dist(lm[8], lm[20]);
+    return spread > 0.18 ? {key:'hello', conf: 0.7 + Math.min(spread,0.3)} : {key:'stop', conf:0.65};
+  }
+  // Fist: no fingers extended
+  if(extendedCount === 0 && !thumbUp){
+    return {key:'no', conf:0.72};
+  }
+  // Thumbs up only
+  if(extendedCount === 0 && thumbUp){
+    return {key:'yes', conf:0.78};
+  }
+  // Peace / V sign
+  if(index && middle && !ring && !pinky){
+    return {key:'come', conf:0.75};
+  }
+  // Index only pointing
+  if(index && !middle && !ring && !pinky){
+    return {key:'good', conf:0.68};
+  }
+  // Pinky + thumb only (shaka-like)
+  if(!index && !middle && !ring && pinky && thumbUp){
+    return {key:'friend', conf:0.66};
+  }
+  // Three fingers (index, middle, ring) no pinky
+  if(index && middle && ring && !pinky){
+    return {key:'sorry', conf:0.62};
+  }
+  // "I Love You" handshape: thumb + index + pinky extended, middle & ring folded
+  const thumbSplayed = dist(lm[4], lm[13]) > 0.15;
+  if(index && pinky && !middle && !ring && thumbSplayed){
+    return {key:'love', conf:0.74};
+  }
+  // "OK" handshape: thumb & index pinched into a circle, other three extended
+  const pinch = dist(lm[4], lm[8]);
+  if(!index && middle && ring && pinky && pinch < 0.07){
+    return {key:'ok', conf:0.7};
+  }
+  return null;
+}
+
+// ---------- TWO-HAND (COMPOUND) GESTURES ----------
+// Runs when both hands are visible. These rely on the *relationship* between
+// the two hands (distance, stacking) rather than a single handshape, so they
+// cover a small set of compound signs that a one-hand classifier can't reach.
+function classifyTwoHand(lmA, lmB){
+  const wristDist = dist(lmA[0], lmB[0]);
+  const shapeOf = (lm) => {
+    const idx = fingerExtended(lm,8,6,5), mid = fingerExtended(lm,12,10,9);
+    const rng = fingerExtended(lm,16,14,13), pnk = fingerExtended(lm,20,18,17);
+    return [idx,mid,rng,pnk].filter(Boolean).length;
+  };
+  const countA = shapeOf(lmA), countB = shapeOf(lmB);
+  // Two closed fists held close together
+  if(countA === 0 && countB === 0 && wristDist < 0.28){
+    return {key:'together', conf:0.68};
+  }
+  // One flat open hand stacked near a closed fist (help handshape)
+  const oneFlat = (countA === 4 && countB === 0) || (countA === 0 && countB === 4);
+  if(oneFlat && wristDist < 0.3){
+    return {key:'help', conf:0.65};
+  }
+  return null;
+}
+
+// ---------- ALPHABET (FINGERSPELLING) CLASSIFIER ----------
+// Same idea as classifyGesture: pure geometry over the 21 hand landmarks,
+// no trained model. Covers 16 of 26 ASL letters — the ones distinguishable
+// from a single 2D-ish snapshot of finger-extension + thumb position. Letters
+// that hinge on wrist rotation or fine thumb overlap (E, G, H, K, M, N, P, Q,
+// R, T) are intentionally left out rather than guessed at unreliably.
+function extRatio(lm, tip, pip){
+  return dist(lm[tip], lm[0]) / dist(lm[pip], lm[0]);
+}
+function classifyAlphabet(lm){
+  const index = fingerExtended(lm, 8, 6, 5);
+  const middle = fingerExtended(lm, 12, 10, 9);
+  const ring = fingerExtended(lm, 16, 14, 13);
+  const pinky = fingerExtended(lm, 20, 18, 17);
+  const extendedCount = [index, middle, ring, pinky].filter(Boolean).length;
+
+  const thumbTipToIndexTip = dist(lm[4], lm[8]);
+  const thumbTipToMiddleTip = dist(lm[4], lm[12]);
+  const thumbTipToMiddleMCP = dist(lm[4], lm[9]);
+  const thumbTipToPinkyMCP = dist(lm[4], lm[17]);
+  const thumbAcrossPalm = thumbTipToMiddleMCP < 0.075; // thumb tucked over the front of curled/flat fingers
+  const thumbOutSide = thumbTipToPinkyMCP > 0.15; // thumb sticking out away from the fist, roughly perpendicular
+  const curlSpan = dist(lm[8], lm[0]); // index tip to wrist — separates a tight fist from a loosely curved hand
+
+  // -- F: thumb & index tips pinched together, other three fingers extended
+  if(thumbTipToIndexTip < 0.055 && middle && ring && pinky){
+    return {key:'F', conf:0.72};
+  }
+  // -- D: index up alone, thumb tip resting on the folded middle finger
+  if(index && !middle && !ring && !pinky && thumbTipToMiddleTip < 0.08 && !thumbOutSide){
+    return {key:'D', conf:0.7};
+  }
+  // -- L: index up alone, thumb extended out wide (right angle)
+  if(index && !middle && !ring && !pinky && thumbOutSide){
+    return {key:'L', conf:0.72};
+  }
+  // -- X: index partially hooked (bent at the middle knuckle, not fully curled or extended)
+  const indexRatio = extRatio(lm, 8, 6);
+  if(!middle && !ring && !pinky && indexRatio > 0.95 && indexRatio <= 1.15 && !thumbOutSide){
+    return {key:'X', conf:0.58};
+  }
+  // -- Y: thumb and pinky out, other three folded ("hang loose")
+  if(pinky && !index && !middle && !ring && thumbOutSide){
+    return {key:'Y', conf:0.72};
+  }
+  // -- I: pinky up alone, thumb tucked in (not out to the side)
+  if(pinky && !index && !middle && !ring && !thumbOutSide){
+    return {key:'I', conf:0.68};
+  }
+  // -- W: index, middle, ring up and spread apart, pinky folded
+  if(index && middle && ring && !pinky){
+    const spread = dist(lm[8], lm[16]);
+    return spread > 0.13 ? {key:'W', conf:0.66} : {key:'B', conf:0.6};
+  }
+  // -- V vs U: index + middle up, distinguished by how spread apart they are
+  if(index && middle && !ring && !pinky){
+    const spread = dist(lm[8], lm[12]);
+    return spread > 0.085 ? {key:'V', conf:0.72} : {key:'U', conf:0.68};
+  }
+  // -- B: all four fingers up together, thumb folded across the palm
+  if(extendedCount === 4 && thumbAcrossPalm){
+    return {key:'B', conf:0.68};
+  }
+  // Remaining shapes all have zero extended fingers — distinguish by how
+  // curled the hand is and where the thumb sits.
+  if(extendedCount === 0){
+    // -- O: fingers curved (not clenched) with thumb tip near the curled index tip, forming a loop
+    if(curlSpan > 0.23 && thumbTipToIndexTip < 0.10){
+      return {key:'O', conf:0.6};
+    }
+    // -- C: fingers curved (not clenched), thumb not touching — open curve
+    if(curlSpan > 0.23){
+      return {key:'C', conf:0.58};
+    }
+    // -- S: closed fist, thumb wrapped across the front of the fingers
+    if(thumbAcrossPalm){
+      return {key:'S', conf:0.65};
+    }
+    // -- A: closed fist, thumb resting on the side instead of across the front
+    if(thumbOutSide || !thumbAcrossPalm){
+      return {key:'A', conf:0.68};
+    }
+  }
+  return null;
+}
+
+// -- J: traced with the pinky while holding the "I" handshape. Approximated
+// as an I-handshape whose pinky tip shows real movement (a dip then a curl)
+// within a short window — a coarse trajectory check, not true motion modelling.
+function trackJ(handsLm){
+  if(!handsLm || handsLm.length === 0){ jMotionBuffer = []; return null; }
+  const lm = handsLm[0];
+  const index = fingerExtended(lm, 8, 6, 5);
+  const middle = fingerExtended(lm, 12, 10, 9);
+  const ring = fingerExtended(lm, 16, 14, 13);
+  const pinky = fingerExtended(lm, 20, 18, 17);
+  const nowMs = performance.now();
+  if(!(pinky && !index && !middle && !ring)){ jMotionBuffer = []; return null; }
+  jMotionBuffer.push({ x: lm[20].x, y: lm[20].y, t: nowMs });
+  jMotionBuffer = jMotionBuffer.filter(p => nowMs - p.t <= 700);
+  if(jMotionBuffer.length < 5) return null;
+  const dx = Math.max(...jMotionBuffer.map(p=>p.x)) - Math.min(...jMotionBuffer.map(p=>p.x));
+  const dy = Math.max(...jMotionBuffer.map(p=>p.y)) - Math.min(...jMotionBuffer.map(p=>p.y));
+  if(dx > 0.05 && dy > 0.05) return { key:'J', conf:0.55 };
+  return null;
+}
+
+// -- Z: traced with the index finger pointing, requiring a couple of
+// left-right direction reversals within a short window (a zigzag stand-in
+// for the actual "Z" path). Same coarse-heuristic caveat as J.
+function trackZ(handsLm){
+  if(!handsLm || handsLm.length === 0){ zMotionBuffer = []; return null; }
+  const lm = handsLm[0];
+  const index = fingerExtended(lm, 8, 6, 5);
+  const middle = fingerExtended(lm, 12, 10, 9);
+  const ring = fingerExtended(lm, 16, 14, 13);
+  const pinky = fingerExtended(lm, 20, 18, 17);
+  const nowMs = performance.now();
+  if(!(index && !middle && !ring && !pinky)){ zMotionBuffer = []; return null; }
+  zMotionBuffer.push({ x: lm[8].x, t: nowMs });
+  zMotionBuffer = zMotionBuffer.filter(p => nowMs - p.t <= 900);
+  if(zMotionBuffer.length < 6) return null;
+  let reversals = 0, dir = 0;
+  for(let i=1;i<zMotionBuffer.length;i++){
+    const d = zMotionBuffer[i].x - zMotionBuffer[i-1].x;
+    if(Math.abs(d) < 0.004) continue;
+    const nd = d > 0 ? 1 : -1;
+    if(dir !== 0 && nd !== dir) reversals++;
+    dir = nd;
+  }
+  if(reversals >= 2) return { key:'Z', conf:0.55 };
+  return null;
+}
+
+// ---------- MEDIAPIPE SETUP ----------
+function drawLandmarks(landmarksList){
+  overlay.width = overlay.clientWidth;
+  overlay.height = overlay.clientHeight;
+  octx.clearRect(0,0,overlay.width, overlay.height);
+  const CONNECTIONS = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],
+    [9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+  landmarksList.forEach(lm => {
+    octx.strokeStyle = 'rgba(47,191,160,0.85)';
+    octx.lineWidth = 2;
+    CONNECTIONS.forEach(([a,b]) => {
+      octx.beginPath();
+      octx.moveTo(lm[a].x*overlay.width, lm[a].y*overlay.height);
+      octx.lineTo(lm[b].x*overlay.width, lm[b].y*overlay.height);
+      octx.stroke();
+    });
+    lm.forEach(pt => {
+      octx.fillStyle = '#E8663F';
+      octx.beginPath();
+      octx.arc(pt.x*overlay.width, pt.y*overlay.height, 3, 0, Math.PI*2);
+      octx.fill();
+    });
+  });
+}
+
+function onResults(results){
+  fpsFrames++;
+  const now = performance.now();
+  if(now - fpsLast > 1000){
+    const fps = Math.round(fpsFrames * 1000 / (now - fpsLast));
+    fpsCounter.textContent = fps + ' FPS';
+    statFps.textContent = fps;
+    fpsFrames = 0; fpsLast = now;
+  }
+
+  const numHands = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+  handsBadge.textContent = numHands + (numHands===1?' hand':' hands');
+  statHands.textContent = numHands;
+
+  if(numHands === 0){
+    drawLandmarks([]);
+    confBar.style.width = '0%';
+    confVal.textContent = '0%';
+    gestureBadge.textContent = '—';
+    return;
+  }
+
+  drawLandmarks(results.multiHandLandmarks);
+
+  const mode = document.getElementById('mode-select').value;
+  if(mode === 'paused') return;
+
+  if(appMode === 'alphabet'){
+    onResultsAlphabet(results);
+  } else {
+    onResultsWords(results);
+  }
+}
+
+function onResultsWords(results){
+  if(detectionEngine === 'server'){
+    onResultsWordsServer(results);
+    return;
+  }
+  // 1. Two-hand compound signs take priority when both hands are visible.
+  let best = null;
+  if(results.multiHandLandmarks.length === 2){
+    best = classifyTwoHand(results.multiHandLandmarks[0], results.multiHandLandmarks[1]);
+  }
+  // 2. Otherwise (or if no two-hand match) score each hand independently.
+  if(!best){
+    results.multiHandLandmarks.forEach(lm => {
+      const g = classifyGesture(lm);
+      if(g && (!best || g.conf > best.conf)) best = g;
+    });
+  }
+  // 3. Wave-motion check for "bye" — tracks an open hand's x-position and
+  // looks for at least two direction reversals inside the time window.
+  const waveHit = trackWave(results.multiHandLandmarks);
+  if(waveHit && (!best || waveHit.conf > best.conf)) best = waveHit;
+
+  const nowMs = performance.now();
+  if(best){
+    candidateBuffer.push({ key: best.key, conf: best.conf, t: nowMs });
+  }
+  candidateBuffer = candidateBuffer.filter(c => nowMs - c.t <= HOLD_MS);
+
+  const confirmed = confirmCandidate(candidateBuffer, nowMs, HOLD_MS);
+
+  if(confirmed){
+    confBar.style.width = Math.round(confirmed.conf*100) + '%';
+    confVal.textContent = Math.round(confirmed.conf*100) + '%';
+    const word = GESTURE_WORDS[confirmed.key];
+    gestureBadge.textContent = word;
+
+    const nowT = Date.now();
+    if(word !== lastSpokenWord || nowT - lastSpokenTime > 1800){
+      lastSpokenWord = word;
+      lastSpokenTime = nowT;
+      addWord(word);
+      speak(word);
+      logDetection(word, confirmed.conf);
+      candidateBuffer = []; // require a fresh hold before repeating/switching
+      armSentenceTimer();
+    }
+  } else if(best){
+    confBar.style.width = Math.round(best.conf*100) + '%';
+    confVal.textContent = 'holding…';
+    gestureBadge.textContent = GESTURE_WORDS[best.key] + '?';
+  } else {
+    confBar.style.width = '15%';
+    confVal.textContent = '—';
+    gestureBadge.textContent = 'No match';
+  }
+}
+
+// Server-AI path: same hold-to-confirm / speak / transcript pipeline as the
+// browser engine, but the "best" guess for each frame comes from the Flask
+// backend's TensorFlow model instead of the local rule-based classifier.
+async function onResultsWordsServer(results){
+  const lm = results.multiHandLandmarks[0];
+  const prediction = await backendPredict(lm);
+
+  const nowMs = performance.now();
+  if(prediction){
+    candidateBuffer.push({ key: prediction.key, conf: prediction.conf, t: nowMs });
+  }
+  candidateBuffer = candidateBuffer.filter(c => nowMs - c.t <= HOLD_MS);
+
+  const confirmed = confirmCandidate(candidateBuffer, nowMs, HOLD_MS);
+
+  if(confirmed){
+    confBar.style.width = Math.round(confirmed.conf*100) + '%';
+    confVal.textContent = Math.round(confirmed.conf*100) + '%';
+    const word = confirmed.key; // backend labels are already plain words
+    gestureBadge.textContent = word;
+
+    const nowT = Date.now();
+    if(word !== lastSpokenWord || nowT - lastSpokenTime > 1800){
+      lastSpokenWord = word;
+      lastSpokenTime = nowT;
+      addWord(word);
+      speak(word);
+      logDetection(word, confirmed.conf);
+      candidateBuffer = [];
+      armSentenceTimer();
+    }
+  } else if(prediction){
+    confBar.style.width = Math.round(prediction.conf*100) + '%';
+    confVal.textContent = 'holding…';
+    gestureBadge.textContent = prediction.key + '?';
+  } else {
+    confBar.style.width = '15%';
+    confVal.textContent = '—';
+    gestureBadge.textContent = 'No match';
+  }
+}
+
+function onResultsAlphabet(results){
+  const lm = results.multiHandLandmarks[0];
+  let best = classifyAlphabet(lm);
+
+  // Motion-traced letters get a chance to override the static read if they fire.
+  const jHit = trackJ(results.multiHandLandmarks);
+  if(jHit && (!best || jHit.conf > best.conf)) best = jHit;
+  const zHit = trackZ(results.multiHandLandmarks);
+  if(zHit && (!best || zHit.conf > best.conf)) best = zHit;
+
+  const nowMs = performance.now();
+  if(best){
+    alphaBuffer.push({ key: best.key, conf: best.conf, t: nowMs });
+  }
+  alphaBuffer = alphaBuffer.filter(c => nowMs - c.t <= ALPHA_HOLD_MS);
+
+  const confirmed = confirmCandidate(alphaBuffer, nowMs, ALPHA_HOLD_MS);
+
+  if(confirmed){
+    confBar.style.width = Math.round(confirmed.conf*100) + '%';
+    confVal.textContent = Math.round(confirmed.conf*100) + '%';
+    const letter = confirmed.key;
+    gestureBadge.textContent = letter;
+
+    const nowT = Date.now();
+    if(letter !== lastSpokenLetter || nowT - lastSpokenLetterTime > 1500){
+      lastSpokenLetter = letter;
+      lastSpokenLetterTime = nowT;
+      addLetter(letter);
+      speak(letter);
+      logDetection(letter, confirmed.conf);
+      alphaBuffer = []; // require a fresh hold before repeating/switching
+      armLetterLineTimer();
+    }
+  } else if(best){
+    confBar.style.width = Math.round(best.conf*100) + '%';
+    confVal.textContent = 'holding…';
+    gestureBadge.textContent = best.key + '?';
+  } else {
+    confBar.style.width = '15%';
+    confVal.textContent = '—';
+    gestureBadge.textContent = 'No match';
+  }
+}
+
+// Requires the same key to dominate the rolling buffer for at least HOLD_MS
+// before it counts as a real detection — this is the "hold the sign steady"
+// behaviour a human signer naturally does, and it's what keeps a per-frame
+// geometric classifier from firing on transitional hand shapes.
+function confirmCandidate(buffer, nowMs, holdMs){
+  if(buffer.length === 0) return null;
+  const span = nowMs - buffer[0].t;
+  if(span < holdMs * 0.7) return null;
+  const counts = {};
+  buffer.forEach(c => counts[c.key] = (counts[c.key]||0) + 1);
+  const [topKey, topCount] = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+  if(topCount / buffer.length < MIN_AGREEMENT) return null;
+  const avgConf = buffer.filter(c=>c.key===topKey).reduce((s,c)=>s+c.conf,0) / topCount;
+  return { key: topKey, conf: avgConf };
+}
+
+// Simple wave detector: an open, spread hand whose wrist x-position reverses
+// direction at least twice inside WAVE_WINDOW_MS reads as "bye". This is a
+// coarse trajectory heuristic, not real temporal-sequence modelling — it
+// will occasionally miss a wave or fire on fast unrelated motion.
+function trackWave(handsLm){
+  if(!handsLm || handsLm.length === 0){ waveBuffer = []; return null; }
+  const lm = handsLm[0];
+  const idx = fingerExtended(lm,8,6,5), mid = fingerExtended(lm,12,10,9);
+  const rng = fingerExtended(lm,16,14,13), pnk = fingerExtended(lm,20,18,17);
+  const open = [idx,mid,rng,pnk].filter(Boolean).length === 4;
+  const nowMs = performance.now();
+  if(!open){ waveBuffer = waveBuffer.filter(p => nowMs - p.t <= WAVE_WINDOW_MS); return null; }
+  waveBuffer.push({ x: lm[0].x, t: nowMs });
+  waveBuffer = waveBuffer.filter(p => nowMs - p.t <= WAVE_WINDOW_MS);
+  if(waveBuffer.length < 6) return null;
+  let reversals = 0, dir = 0;
+  for(let i=1;i<waveBuffer.length;i++){
+    const d = waveBuffer[i].x - waveBuffer[i-1].x;
+    if(Math.abs(d) < 0.004) continue;
+    const nd = d > 0 ? 1 : -1;
+    if(dir !== 0 && nd !== dir) reversals++;
+    dir = nd;
+  }
+  if(reversals >= 2) return { key:'bye', conf:0.7 };
+  return null;
+}
+
+// ---------- SENTENCE-PAUSE FINALIZATION ----------
+// A short silence after signing reads as "end of sentence" — same as a pause
+// in speech. When it happens, the current gloss buffer is converted through
+// the phrase templates and dropped into the conversation log as a finished
+// line, the way a captioning/interpreter view would show it.
+function armSentenceTimer(){
+  lastWordTime = Date.now();
+  if(sentenceTimer) clearTimeout(sentenceTimer);
+  sentenceTimer = setTimeout(() => {
+    if(Date.now() - lastWordTime >= SENTENCE_PAUSE_MS - 50) finalizeSentence();
+  }, SENTENCE_PAUSE_MS);
+}
+function finalizeSentence(){
+  if(sentence.length === 0) return;
+  const naturalText = toNaturalSentence(sentence);
+  conversationLog.unshift({ gloss: sentence.slice(), text: naturalText, time: new Date() });
+  sentence = [];
+  renderSentence();
+  renderConversationLog();
+  if(speakOnDetect && 'speechSynthesis' in window){
+    // speak the finished, grammatical sentence — not just the raw word list
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(naturalText);
+    const sel = document.getElementById('voice-select');
+    if(voices[sel.value]) u.voice = voices[sel.value];
+    u.rate = parseFloat(document.getElementById('rate-range').value);
+    u.volume = parseFloat(document.getElementById('vol-range').value);
+    window.speechSynthesis.speak(u);
+  }
+}
+function renderConversationLog(){
+  const wrap = document.getElementById('conversation-wrap');
+  if(!wrap) return;
+  if(conversationLog.length === 0){
+    wrap.innerHTML = '<div class="hist-empty">Finished sentences will appear here after a short pause between signs.</div>';
+    return;
+  }
+  wrap.innerHTML = conversationLog.slice(0,10).map(c => `
+    <div class="convo-line">
+      <div class="convo-text">${c.text}</div>
+      <div class="convo-meta">${c.gloss.join(' · ')} — ${c.time.toLocaleTimeString()}</div>
+    </div>`).join('');
+}
+
+async function startCamera(){
+  document.getElementById('start-cam').textContent = 'Starting…';
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode: currentFacing } });
+    videoEl.srcObject = stream;
+    await videoEl.play();
+  }catch(err){
+    stageEmpty.innerHTML = `<span style="font-size:28px;">⚠️</span><p style="max-width:260px;margin:0;">Camera access was blocked or unavailable: ${err.message}. Check your browser's camera permission for this page.</p>`;
+    return;
+  }
+  stageEmpty.style.display = 'none';
+  hud.style.display = 'flex';
+  liveDot.classList.add('live');
+
+  if(!hands){
+    hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+    hands.setOptions({
+      maxNumHands: 2,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.6,
+      minTrackingConfidence: 0.5
+    });
+    hands.onResults(onResults);
+  }
+
+  camera = new Camera(videoEl, {
+    onFrame: async () => { await hands.send({image: videoEl}); },
+    width: 640, height: 480
+  });
+  camera.start();
+}
+
+document.getElementById('start-cam').onclick = startCamera;
+document.getElementById('stop-cam').onclick = () => {
+  if(camera){ camera.stop(); camera = null; }
+  const stream = videoEl.srcObject;
+  if(stream){ stream.getTracks().forEach(t => t.stop()); }
+  videoEl.srcObject = null;
+  stageEmpty.style.display = 'flex';
+  stageEmpty.innerHTML = `<span style="font-size:28px;">✋</span><p style="max-width:260px;margin:0;">Camera stopped. Re-enable to keep signing.</p><button id="start-cam-2">Enable camera</button>`;
+  document.getElementById('start-cam-2').onclick = startCamera;
+  hud.style.display = 'none';
+  liveDot.classList.remove('live');
+  octx.clearRect(0,0,overlay.width, overlay.height);
+};
+document.getElementById('switch-cam').onclick = async () => {
+  currentFacing = currentFacing === 'user' ? 'environment' : 'user';
+  if(videoEl.srcObject){
+    const stream = videoEl.srcObject;
+    stream.getTracks().forEach(t => t.stop());
+    if(camera) camera.stop();
+    await startCamera();
+  }
+};
+
+renderSentence();
+renderAlphabet();
+</script>
+</body>
+</html>
