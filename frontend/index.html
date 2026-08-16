@@ -8,6 +8,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <style>
   :root{
     --ink:#161A23;
@@ -295,6 +297,35 @@
     background:#171C26;border:1px solid #2A3040;color:#D7DBE4;padding:7px 12px;border-radius:8px;
     font-size:11.5px;cursor:pointer;
   }
+  .history-modal{
+    position:fixed;inset:0;background:rgba(5,7,10,.7);display:none;align-items:center;justify-content:center;
+    padding:18px;z-index:20;
+  }
+  .history-modal.open{display:flex;}
+  .history-dialog{
+    width:min(860px,100%);max-height:86vh;overflow:auto;background:#1C212C;border:1px solid #2A3040;
+    border-radius:14px;padding:18px;color:#EDEFF4;box-shadow:0 18px 60px rgba(0,0,0,.35);
+  }
+  .history-dialog-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;}
+  .history-dialog-head h3{
+    font-family:'JetBrains Mono',monospace;text-transform:uppercase;font-size:11px;letter-spacing:.1em;
+    color:var(--muted);margin:0;
+  }
+  .history-dialog-head button,.history-refresh{
+    background:#171C26;border:1px solid #2A3040;color:#D7DBE4;padding:7px 12px;border-radius:8px;
+    font-size:11.5px;cursor:pointer;
+  }
+  .history-section-title{
+    font-family:'JetBrains Mono',monospace;text-transform:uppercase;font-size:10.5px;letter-spacing:.1em;
+    color:var(--teal);margin:14px 0 8px;
+  }
+  .saved-row{border-bottom:1px solid #2A3040;padding:8px 0;font-size:12.5px;line-height:1.4;}
+  .saved-row b{color:#EDEFF4;}
+  .saved-row span{color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10.5px;}
+  body.light .history-dialog{background:#fff;border-color:#E4DCC8;color:var(--ink);}
+  body.light .history-dialog-head button, body.light .history-refresh{background:#F6F1E7;border-color:#E4DCC8;color:#4B4531;}
+  body.light .saved-row{border-bottom-color:#EAE2CC;}
+  body.light .saved-row b{color:var(--ink);}
   .note{
     margin-top:18px;font-size:11.5px;color:#6C7689;line-height:1.6;background:#171C26;
     border:1px solid #232936;border-radius:12px;padding:14px 16px;
@@ -470,6 +501,7 @@
       </div>
       <div class="hist-actions">
         <button id="export-csv">⬇ Export CSV</button>
+        <button id="view-saved-history">View saved</button>
         <button id="clear-history">Clear history</button>
       </div>
     </div>
@@ -482,6 +514,19 @@
         <div class="stat"><div class="num" id="stat-most">—</div><div class="lbl">Most used sign</div></div>
         <div class="stat"><div class="num" id="stat-hands">0</div><div class="lbl">Hands tracked now</div></div>
         <div class="stat"><div class="num" id="stat-fps">0</div><div class="lbl">Camera FPS</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="history-modal" id="saved-history-modal">
+    <div class="history-dialog">
+      <div class="history-dialog-head">
+        <h3>Saved Firebase History</h3>
+        <button id="close-saved-history">Close</button>
+      </div>
+      <button class="history-refresh" id="refresh-saved-history">Refresh</button>
+      <div id="saved-history-content">
+        <div class="hist-empty">Saved history will load from Firebase.</div>
       </div>
     </div>
   </div>
@@ -679,6 +724,183 @@ let backendGestures = [];          // labels the trained model actually knows
 let lastBackendCallAt = 0;
 const BACKEND_THROTTLE_MS = 350;   // don't hammer the API every frame
 let backendBusy = false;
+
+// ---------- FIREBASE REALTIME DATABASE ----------
+const firebaseConfig = {
+  apiKey: "AIzaSyDhcU_-igme4yghWnM-j9Ki0Hjvt9BrFNE",
+  authDomain: "hand-gesture-2026.firebaseapp.com",
+  databaseURL: "https://hand-gesture-2026-default-rtdb.firebaseio.com",
+  projectId: "hand-gesture-2026",
+  storageBucket: "hand-gesture-2026.firebasestorage.app",
+  messagingSenderId: "879957266853",
+  appId: "1:879957266853:web:c6059bdf482ec30448984c",
+  measurementId: "G-YWNX91E3PM"
+};
+let firebaseDb = null;
+let firebaseReady = false;
+let firebaseSessionId = null;
+
+function getFirebaseSessionId(){
+  const key = 'signspeakFirebaseSessionId';
+  let id = localStorage.getItem(key);
+  if(!id){
+    id = 'session_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+    localStorage.setItem(key, id);
+  }
+  return id;
+}
+
+function initFirebase(){
+  try{
+    if(!window.firebase || !firebase.database) return;
+    if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    firebaseDb = firebase.database();
+    firebaseSessionId = getFirebaseSessionId();
+    firebaseReady = true;
+  }catch(err){
+    firebaseReady = false;
+    console.warn('Firebase init failed:', err);
+  }
+}
+
+function firebasePath(collection){
+  return `signspeak/sessions/${firebaseSessionId}/${collection}`;
+}
+
+function firebasePayloadTime(date){
+  return date instanceof Date ? date.toISOString() : new Date().toISOString();
+}
+
+function escapeHtml(value){
+  return String(value).replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  }[ch]));
+}
+
+function saveDetectionToFirebase(entry){
+  if(!firebaseReady || !firebaseDb) return;
+  const payload = {
+    word: entry.word,
+    confidence: Number(entry.confidence || 0),
+    mode: appMode,
+    time: firebasePayloadTime(entry.time),
+    createdAt: firebase.database.ServerValue.TIMESTAMP
+  };
+  firebaseDb.ref(firebasePath('detections')).push(payload).catch(err => {
+    console.warn('Firebase detection save failed:', err);
+  });
+}
+
+function saveConversationToFirebase(entry, source){
+  if(!firebaseReady || !firebaseDb) return;
+  const payload = {
+    text: entry.text,
+    gloss: entry.gloss || [],
+    source: source || appMode,
+    time: firebasePayloadTime(entry.time),
+    createdAt: firebase.database.ServerValue.TIMESTAMP
+  };
+  firebaseDb.ref(firebasePath('conversations')).push(payload).catch(err => {
+    console.warn('Firebase conversation save failed:', err);
+  });
+}
+
+function loadFirebaseHistory(){
+  if(!firebaseReady || !firebaseDb) return;
+  firebaseDb.ref(firebasePath('detections')).orderByChild('createdAt').limitToLast(50).once('value')
+    .then(snapshot => {
+      const loaded = [];
+      snapshot.forEach(child => {
+        const item = child.val() || {};
+        if(!item.word) return;
+        loaded.push({
+          word: String(item.word),
+          confidence: Number(item.confidence || 0),
+          time: item.time ? new Date(item.time) : new Date(item.createdAt || Date.now())
+        });
+      });
+      if(loaded.length){
+        history = loaded.reverse();
+        renderHistory();
+        renderDashboard();
+      }
+    })
+    .catch(err => console.warn('Firebase history load failed:', err));
+}
+
+function loadFirebaseConversations(){
+  if(!firebaseReady || !firebaseDb) return;
+  firebaseDb.ref(firebasePath('conversations')).orderByChild('createdAt').limitToLast(20).once('value')
+    .then(snapshot => {
+      const loaded = [];
+      snapshot.forEach(child => {
+        const item = child.val() || {};
+        if(!item.text) return;
+        loaded.push({
+          text: String(item.text),
+          gloss: Array.isArray(item.gloss) ? item.gloss.map(String) : [],
+          time: item.time ? new Date(item.time) : new Date(item.createdAt || Date.now())
+        });
+      });
+      if(loaded.length){
+        conversationLog = loaded.reverse();
+        renderConversationLog();
+      }
+    })
+    .catch(err => console.warn('Firebase conversations load failed:', err));
+}
+
+function clearFirebaseHistory(){
+  if(!firebaseReady || !firebaseDb) return;
+  firebaseDb.ref(firebasePath('detections')).remove().catch(err => {
+    console.warn('Firebase history clear failed:', err);
+  });
+}
+
+async function fetchSavedFirebaseHistory(){
+  if(!firebaseReady || !firebaseDb){
+    return { detections: [], conversations: [], error: 'Firebase is not connected yet.' };
+  }
+  try{
+    const [detectionsSnap, conversationsSnap] = await Promise.all([
+      firebaseDb.ref(firebasePath('detections')).orderByChild('createdAt').limitToLast(100).once('value'),
+      firebaseDb.ref(firebasePath('conversations')).orderByChild('createdAt').limitToLast(50).once('value')
+    ]);
+    const detections = [];
+    detectionsSnap.forEach(child => {
+      const item = child.val() || {};
+      if(!item.word) return;
+      detections.push({
+        word: String(item.word),
+        confidence: Number(item.confidence || 0),
+        mode: String(item.mode || ''),
+        time: item.time ? new Date(item.time) : new Date(item.createdAt || Date.now())
+      });
+    });
+    const conversations = [];
+    conversationsSnap.forEach(child => {
+      const item = child.val() || {};
+      if(!item.text) return;
+      conversations.push({
+        text: String(item.text),
+        source: String(item.source || ''),
+        gloss: Array.isArray(item.gloss) ? item.gloss.map(String) : [],
+        time: item.time ? new Date(item.time) : new Date(item.createdAt || Date.now())
+      });
+    });
+    return {
+      detections: detections.reverse(),
+      conversations: conversations.reverse(),
+      error: ''
+    };
+  }catch(err){
+    return { detections: [], conversations: [], error: err.message || 'Could not load Firebase history.' };
+  }
+}
 
 async function checkBackendHealth(){
   const statusEl = document.getElementById('engine-status');
@@ -915,7 +1137,9 @@ function armLetterLineTimer(){
 function finalizeSpelling(){
   const text = spellText.trim();
   if(!text) return;
-  conversationLog.unshift({ gloss: text.split(' '), text: text, time: new Date() });
+  const entry = { gloss: text.split(' '), text: text, time: new Date() };
+  conversationLog.unshift(entry);
+  saveConversationToFirebase(entry, 'alphabet');
   spellText = '';
   renderAlphabet();
   renderConversationLog();
@@ -972,6 +1196,7 @@ function logDetection(word, confidence){
   history.unshift(entry);
   renderHistory();
   renderDashboard();
+  saveDetectionToFirebase(entry);
 }
 function renderHistory(){
   const wrap = document.getElementById('history-wrap');
@@ -981,7 +1206,7 @@ function renderHistory(){
   }
   const rows = history.slice(0,8).map(e => `
     <tr>
-      <td>${e.word}</td>
+      <td>${escapeHtml(e.word)}</td>
       <td class="conf">${Math.round(e.confidence*100)}%</td>
       <td>${e.time.toLocaleTimeString()}</td>
     </tr>`).join('');
@@ -1010,7 +1235,57 @@ document.getElementById('export-csv').onclick = () => {
   a.href = url; a.download = 'mrvoxa-history.csv'; a.click();
   URL.revokeObjectURL(url);
 };
-document.getElementById('clear-history').onclick = () => { history = []; renderHistory(); renderDashboard(); };
+document.getElementById('clear-history').onclick = () => {
+  history = [];
+  renderHistory();
+  renderDashboard();
+  clearFirebaseHistory();
+};
+
+async function showSavedHistory(){
+  const modal = document.getElementById('saved-history-modal');
+  const content = document.getElementById('saved-history-content');
+  modal.classList.add('open');
+  content.innerHTML = '<div class="hist-empty">Loading saved Firebase data...</div>';
+  const data = await fetchSavedFirebaseHistory();
+  if(data.error){
+    content.innerHTML = `<div class="hist-empty">${escapeHtml(data.error)}</div>`;
+    return;
+  }
+
+  const detectionRows = data.detections.length
+    ? data.detections.map(e => `
+      <div class="saved-row">
+        <b>${escapeHtml(e.word)}</b> (${Math.round(e.confidence * 100)}%)
+        <span>${escapeHtml(e.mode || 'gesture')} - ${e.time.toLocaleString()}</span>
+      </div>`).join('')
+    : '<div class="hist-empty">No saved detections found.</div>';
+
+  const conversationRows = data.conversations.length
+    ? data.conversations.map(c => `
+      <div class="saved-row">
+        <b>${escapeHtml(c.text)}</b>
+        <span>${escapeHtml(c.source || 'conversation')} - ${c.time.toLocaleString()}</span>
+      </div>`).join('')
+    : '<div class="hist-empty">No saved conversations found.</div>';
+
+  content.innerHTML = `
+    <div class="history-section-title">Detections</div>
+    ${detectionRows}
+    <div class="history-section-title">Conversations</div>
+    ${conversationRows}
+  `;
+}
+document.getElementById('view-saved-history').onclick = showSavedHistory;
+document.getElementById('refresh-saved-history').onclick = showSavedHistory;
+document.getElementById('close-saved-history').onclick = () => {
+  document.getElementById('saved-history-modal').classList.remove('open');
+};
+document.getElementById('saved-history-modal').onclick = (event) => {
+  if(event.target.id === 'saved-history-modal'){
+    event.currentTarget.classList.remove('open');
+  }
+};
 
 // ---------- GESTURE CLASSIFIER (rule-based, geometric) ----------
 // Landmarks indices: 0 wrist, 4 thumb tip, 8 index tip, 12 middle tip, 16 ring tip, 20 pinky tip
@@ -1494,7 +1769,9 @@ function armSentenceTimer(){
 function finalizeSentence(){
   if(sentence.length === 0) return;
   const naturalText = toNaturalSentence(sentence);
-  conversationLog.unshift({ gloss: sentence.slice(), text: naturalText, time: new Date() });
+  const entry = { gloss: sentence.slice(), text: naturalText, time: new Date() };
+  conversationLog.unshift(entry);
+  saveConversationToFirebase(entry, 'words');
   sentence = [];
   renderSentence();
   renderConversationLog();
@@ -1518,7 +1795,7 @@ function renderConversationLog(){
   }
   wrap.innerHTML = conversationLog.slice(0,10).map(c => `
     <div class="convo-line">
-      <div class="convo-text">${c.text}</div>
+      <div class="convo-text">${escapeHtml(c.text)}</div>
       <div class="convo-meta">${c.gloss.join(' · ')} — ${c.time.toLocaleTimeString()}</div>
     </div>`).join('');
 }
@@ -1578,6 +1855,9 @@ document.getElementById('switch-cam').onclick = async () => {
   }
 };
 
+initFirebase();
+loadFirebaseHistory();
+loadFirebaseConversations();
 renderSentence();
 renderAlphabet();
 </script>

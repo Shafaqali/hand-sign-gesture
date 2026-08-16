@@ -1,0 +1,37 @@
+Firebase Realtime Database rules for SignSpeak AI
+
+Paste this JSON in:
+Firebase Console -> Realtime Database -> Rules
+
+Demo/public rules:
+
+{
+  "rules": {
+    "signspeak": {
+      ".read": true,
+      "sessions": {
+        "$sessionId": {
+          "detections": {
+            ".write": true,
+            "$detectionId": {
+              ".validate": "newData.hasChildren(['word', 'confidence', 'mode', 'time', 'createdAt']) && newData.child('word').isString() && newData.child('word').val().length <= 80 && newData.child('confidence').isNumber() && newData.child('confidence').val() >= 0 && newData.child('confidence').val() <= 1 && newData.child('mode').isString() && (newData.child('mode').val() == 'words' || newData.child('mode').val() == 'alphabet') && newData.child('time').isString()"
+            }
+          },
+          "conversations": {
+            ".write": true,
+            "$conversationId": {
+              ".validate": "newData.hasChildren(['text', 'gloss', 'source', 'time', 'createdAt']) && newData.child('text').isString() && newData.child('text').val().length <= 500 && newData.child('source').isString() && (newData.child('source').val() == 'words' || newData.child('source').val() == 'alphabet') && newData.child('time').isString()"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+Important:
+- These are demo rules. Anyone with your database URL can read/write under signspeak.
+- For production, enable Firebase Authentication and change .read/.write to auth-based rules.
+- Current frontend stores data under:
+  signspeak/sessions/{browserSessionId}/detections
+  signspeak/sessions/{browserSessionId}/conversations
