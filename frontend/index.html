@@ -718,7 +718,7 @@ function toNaturalSentence(words){
 }
 
 // ---------- BACKEND (TensorFlow) ENGINE INTEGRATION ----------
-const BACKEND_URL = ''; // same-origin (Flask serves this file) — leave blank
+const BACKEND_URL = 'https://hand-sign-gesture.onrender.com'; // same-origin (Flask serves this file) — leave blank
 let detectionEngine = 'browser';   // 'browser' | 'server'
 let backendGestures = [];          // labels the trained model actually knows
 let lastBackendCallAt = 0;
