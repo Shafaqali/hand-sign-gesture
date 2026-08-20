@@ -24,7 +24,12 @@ import cv2
 import mediapipe as mp
 
 from gestures import GESTURES, canonical_label, validate_gestures
-from utils import landmarks_from_mediapipe, normalize_landmarks
+from utils import (
+    NUM_FEATURES,
+    multi_hand_landmarks_from_mediapipe,
+    normalize_multi_hand_landmarks,
+    pad_or_trim_features,
+)
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 CSV_PATH = os.path.join(DATA_DIR, "landmarks.csv")
@@ -32,7 +37,11 @@ SAMPLES_PER_SECOND = 8
 
 
 def build_key_map(gestures):
-    keys = [str(i) for i in range(10)] + [chr(c) for c in range(ord("a"), ord("z") + 1)]
+    keys = (
+        [str(i) for i in range(10)]
+        + [chr(c) for c in range(ord("a"), ord("z") + 1)]
+        + list("!@#$%^&*()-_=+[]{};,./?<>")
+    )
     if len(gestures) > len(keys):
         raise ValueError(f"Too many gestures ({len(gestures)}) - max supported is {len(keys)}.")
     return {keys[i]: i for i in range(len(gestures))}
@@ -43,8 +52,37 @@ def ensure_csv():
     if not os.path.exists(CSV_PATH):
         with open(CSV_PATH, "w", newline="") as f:
             writer = csv.writer(f)
-            header = ["label"] + [f"f{i}" for i in range(63)]
+            header = ["label"] + [f"f{i}" for i in range(NUM_FEATURES)]
             writer.writerow(header)
+        return
+
+    with open(CSV_PATH, "r", newline="") as f:
+        rows = list(csv.reader(f))
+    if not rows:
+        with open(CSV_PATH, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["label"] + [f"f{i}" for i in range(NUM_FEATURES)])
+        return
+
+    current_features = max(0, len(rows[0]) - 1)
+    if current_features == NUM_FEATURES:
+        return
+
+    backup_path = CSV_PATH.replace(".csv", f"_backup_{current_features}_features.csv")
+    os.replace(CSV_PATH, backup_path)
+    with open(CSV_PATH, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["label"] + [f"f{i}" for i in range(NUM_FEATURES)])
+        for row in rows[1:]:
+            if not row:
+                continue
+            label = canonical_label(row[0])
+            if label not in GESTURES:
+                continue
+            features = pad_or_trim_features(row[1:], NUM_FEATURES)
+            writer.writerow([label] + features.tolist())
+    print(f"Migrated CSV from {current_features} to {NUM_FEATURES} features.")
+    print(f"Backup saved: {backup_path}")
 
 
 def load_existing_counts():
@@ -92,9 +130,9 @@ def draw_hud(frame, key_to_index, selected_idx, capturing, counts):
     start_y = 106
     for key_char, idx in key_to_index.items():
         gesture = GESTURES[idx]
-        col = idx % 2
-        row = idx // 2
-        x = 10 + col * 310
+        col = idx % 3
+        row = idx // 3
+        x = 10 + col * 210
         y = start_y + row * 20
         color = (0, 220, 255) if idx == selected_idx else (235, 235, 235)
         cv2.putText(
@@ -116,7 +154,7 @@ def main():
     mp_hands = mp.solutions.hands
     mp_draw = mp.solutions.drawing_utils
     hands = mp_hands.Hands(
-        max_num_hands=1,
+        max_num_hands=2,
         model_complexity=1,
         min_detection_confidence=0.65,
         min_tracking_confidence=0.55,
@@ -138,7 +176,8 @@ def main():
     print("  " + " | ".join(f"{key}:{GESTURES[idx]}" for key, idx in key_to_index.items()))
     print("Controls: key selects gesture | c toggles capture | q saves and quits")
     print(f"Capture rate: {SAMPLES_PER_SECOND} samples/sec")
-    print("Target: 150-300 samples per gesture, with small angle/distance variations.")
+    print("Target: 150-300 samples per gesture, with small angle/distance/one-hand/two-hand variations.")
+    print("Two-hand signs are supported. Keep both hands visible while capturing those signs.")
 
     csv_file = open(CSV_PATH, "a", newline="")
     writer = csv.writer(csv_file)
@@ -154,13 +193,13 @@ def main():
             result = hands.process(rgb)
 
             if result.multi_hand_landmarks:
-                hand_lm = result.multi_hand_landmarks[0]
-                mp_draw.draw_landmarks(frame, hand_lm, mp_hands.HAND_CONNECTIONS)
+                for hand_lm in result.multi_hand_landmarks:
+                    mp_draw.draw_landmarks(frame, hand_lm, mp_hands.HAND_CONNECTIONS)
 
                 now = time.time()
                 if capturing and now - last_capture_at >= 1 / SAMPLES_PER_SECOND:
-                    coords = landmarks_from_mediapipe(hand_lm)
-                    features = normalize_landmarks(coords)
+                    hands_coords = multi_hand_landmarks_from_mediapipe(result.multi_hand_landmarks)
+                    features = normalize_multi_hand_landmarks(hands_coords)
                     label = GESTURES[selected_idx]
                     writer.writerow([label] + features.tolist())
                     counts[label] += 1

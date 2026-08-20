@@ -1,0 +1,229 @@
+{
+  "trained_at": "2026-08-20T14:44:26.156289+00:00",
+  "csv_path": "C:\\Users\\kashaf\\Downloads\\signspeak-ai\\signspeak-ai\\backend\\data\\landmarks.csv",
+  "input_features": 126,
+  "max_hands": 2,
+  "labels": [
+    "bathroom",
+    "bye",
+    "call me",
+    "come",
+    "drink",
+    "eat",
+    "friend",
+    "give",
+    "go",
+    "hello",
+    "home",
+    "love",
+    "no",
+    "ok",
+    "please",
+    "rock on",
+    "school",
+    "sleep",
+    "sorry",
+    "stop",
+    "thank you",
+    "wait",
+    "work",
+    "yes",
+    "you"
+  ],
+  "sample_counts": {
+    "bathroom": 177,
+    "bye": 182,
+    "call me": 159,
+    "come": 165,
+    "drink": 169,
+    "eat": 186,
+    "friend": 153,
+    "give": 167,
+    "go": 188,
+    "hello": 155,
+    "home": 181,
+    "love": 160,
+    "no": 160,
+    "ok": 166,
+    "please": 165,
+    "rock on": 182,
+    "school": 195,
+    "sleep": 188,
+    "sorry": 151,
+    "stop": 169,
+    "thank you": 186,
+    "wait": 154,
+    "work": 163,
+    "yes": 170,
+    "you": 203
+  },
+  "validation_accuracy": 1.0,
+  "validation_loss": 0.0018145841313526034,
+  "epochs_ran": 54,
+  "recommended_samples_per_class": 150,
+  "classification_report": {
+    "bathroom": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 35.0
+    },
+    "bye": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 36.0
+    },
+    "call me": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 32.0
+    },
+    "come": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 33.0
+    },
+    "drink": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 34.0
+    },
+    "eat": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 37.0
+    },
+    "friend": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 31.0
+    },
+    "give": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 33.0
+    },
+    "go": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 38.0
+    },
+    "hello": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 31.0
+    },
+    "home": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 36.0
+    },
+    "love": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 32.0
+    },
+    "no": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 32.0
+    },
+    "ok": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 33.0
+    },
+    "please": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 33.0
+    },
+    "rock on": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 36.0
+    },
+    "school": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 39.0
+    },
+    "sleep": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 38.0
+    },
+    "sorry": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 30.0
+    },
+    "stop": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 34.0
+    },
+    "thank you": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 37.0
+    },
+    "wait": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 31.0
+    },
+    "work": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 33.0
+    },
+    "yes": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 34.0
+    },
+    "you": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 41.0
+    },
+    "accuracy": 1.0,
+    "macro avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 859.0
+    },
+    "weighted avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 859.0
+    }
+  }
+}

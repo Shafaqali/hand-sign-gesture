@@ -6,7 +6,7 @@ Flask backend for SignSpeak AI.
 Architecture (important to understand):
   - Hand tracking (MediaPipe Hands) runs in the BROWSER (JavaScript),
     because that gives real-time webcam access with zero network lag.
-  - The browser sends the 21 (x,y,z) landmark points to this backend.
+  - The browser sends one or two hands of 21 (x,y,z) landmark points to this backend.
   - This backend normalizes them (utils.py, same math used in training)
     and runs them through the TensorFlow model trained by
     train_model.py to get the predicted word/letter.
@@ -18,7 +18,7 @@ Architecture (important to understand):
 Endpoints:
   GET  /                  -> serves the frontend (index.html)
   GET  /api/health        -> {"status": "ok", "model_loaded": bool}
-  POST /api/predict       -> body: {"landmarks": [[x,y,z], ... x21]}
+  POST /api/predict       -> body: {"hands": [[[x,y,z], ... x21], ... up to 2]}
                               returns: {"label": "hello", "confidence": 0.93}
   POST /api/speak         -> body: {"text": "hello there"}
                               returns: audio/mpeg (mp3 file)
@@ -32,7 +32,7 @@ import json
 from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 
-from utils import normalize_landmarks
+from utils import normalize_multi_hand_landmarks, pad_or_trim_features
 
 BASE_DIR = os.path.dirname(__file__)
 FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
@@ -98,15 +98,33 @@ def predict():
         }), 400
 
     data = request.get_json(silent=True)
-    if not data or "landmarks" not in data:
-        return jsonify({"error": "Request body must be {'landmarks': [[x,y,z], ...]}"}), 400
+    if not data:
+        return jsonify({"error": "Request body must include 'hands' or 'landmarks'."}), 400
 
-    landmarks = data["landmarks"]
-    if len(landmarks) != 21:
-        return jsonify({"error": f"Expected 21 landmarks, got {len(landmarks)}"}), 400
+    hands = data.get("hands")
+    if hands is None:
+        landmarks = data.get("landmarks")
+        if not landmarks:
+            return jsonify({"error": "Request body must include 'hands' or 'landmarks'."}), 400
+        if len(landmarks) == 21 and isinstance(landmarks[0], list) and len(landmarks[0]) == 3:
+            hands = [landmarks]
+        else:
+            hands = landmarks
+
+    if not isinstance(hands, list) or len(hands) == 0:
+        return jsonify({"error": "Expected at least one detected hand."}), 400
+    if len(hands) > 2:
+        hands = hands[:2]
+    for hand in hands:
+        if not isinstance(hand, list) or len(hand) != 21:
+            return jsonify({"error": "Each hand must contain exactly 21 landmarks."}), 400
 
     try:
-        features = normalize_landmarks(landmarks).reshape(1, -1)
+        features = normalize_multi_hand_landmarks(hands)
+        expected_shape = _model.input_shape[-1]
+        if expected_shape is not None and expected_shape != len(features):
+            features = pad_or_trim_features(features, int(expected_shape))
+        features = features.reshape(1, -1)
         preds = _model.predict(features, verbose=0)[0]
         best_idx = int(preds.argmax())
         confidence = float(preds[best_idx])

@@ -718,7 +718,15 @@ function toNaturalSentence(words){
 }
 
 // ---------- BACKEND (TensorFlow) ENGINE INTEGRATION ----------
-const BACKEND_URL = 'https://hand-sign-gesture.onrender.com'; // same-origin (Flask serves this file) — leave blank
+const RENDER_BACKEND_URL = 'https://hand-sign-gesture.onrender.com';
+function resolveBackendUrl(){
+  const host = window.location.hostname;
+  if(window.location.protocol === 'file:') return 'http://127.0.0.1:5000';
+  if(host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.')) return '';
+  if(host.endsWith('onrender.com')) return '';
+  return RENDER_BACKEND_URL;
+}
+const BACKEND_URL = resolveBackendUrl();
 let detectionEngine = 'browser';   // 'browser' | 'server'
 let backendGestures = [];          // labels the trained model actually knows
 let lastBackendCallAt = 0;
@@ -921,22 +929,22 @@ async function checkBackendHealth(){
   }
 }
 
-// Sends the 21 raw MediaPipe landmarks for ONE hand to the Flask backend and
+// Sends one or two raw MediaPipe hands to the Flask backend and
 // returns {key, conf} in the same shape the local classifiers use, so the
 // rest of the pipeline (hold-to-confirm, speak, transcript) doesn't care
 // which engine produced the guess.
-async function backendPredict(handLandmarks){
+async function backendPredict(handsLandmarks){
   if(backendBusy) return null;
   const now = performance.now();
   if(now - lastBackendCallAt < BACKEND_THROTTLE_MS) return null;
   lastBackendCallAt = now;
   backendBusy = true;
   try{
-    const landmarks = handLandmarks.map(p => [p.x, p.y, p.z]);
+    const hands = (handsLandmarks || []).slice(0, 2).map(hand => hand.map(p => [p.x, p.y, p.z]));
     const res = await fetch(`${BACKEND_URL}/api/predict`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ landmarks })
+      body: JSON.stringify({ hands })
     });
     const data = await res.json();
     if(data.error || !data.label || data.matched === false) return null;
@@ -1628,8 +1636,7 @@ function onResultsWords(results){
 // browser engine, but the "best" guess for each frame comes from the Flask
 // backend's TensorFlow model instead of the local rule-based classifier.
 async function onResultsWordsServer(results){
-  const lm = results.multiHandLandmarks[0];
-  const prediction = await backendPredict(lm);
+  const prediction = await backendPredict(results.multiHandLandmarks);
 
   const nowMs = performance.now();
   if(prediction){

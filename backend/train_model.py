@@ -15,6 +15,7 @@ Outputs:
 
 import json
 import os
+import csv
 from datetime import datetime, timezone
 
 import numpy as np
@@ -27,6 +28,7 @@ from sklearn.utils.class_weight import compute_class_weight
 from tensorflow.keras import layers, models
 
 from gestures import GESTURES, canonical_label, validate_gestures
+from utils import NUM_FEATURES, pad_or_trim_features
 
 BASE_DIR = os.path.dirname(__file__)
 CSV_PATH = os.path.join(BASE_DIR, "data", "landmarks.csv")
@@ -43,17 +45,32 @@ def load_clean_dataset():
     if not os.path.exists(CSV_PATH):
         raise FileNotFoundError(f"{CSV_PATH} not found. Run collect_data.py first.")
 
-    df = pd.read_csv(CSV_PATH)
-    before = len(df)
-    df = df.dropna(subset=["label"])
-    df["label"] = df["label"].map(canonical_label)
-    df = df[df["label"].isin(GESTURES)]
-    df = df.dropna()
+    rows = []
+    before = 0
+    with open(CSV_PATH, "r", newline="") as f:
+        reader = csv.reader(f)
+        next(reader, None)
+        for row in reader:
+            before += 1
+            if len(row) < 2:
+                continue
+            label = canonical_label(row[0])
+            if label not in GESTURES:
+                continue
+            try:
+                features = pad_or_trim_features(row[1:], NUM_FEATURES)
+            except ValueError:
+                continue
+            rows.append((label, features))
 
-    feature_cols = [c for c in df.columns if c != "label"]
-    df[feature_cols] = df[feature_cols].apply(pd.to_numeric, errors="coerce")
-    df = df.dropna()
-    after = len(df)
+    if not rows:
+        return pd.DataFrame(columns=["label"] + [f"f{i}" for i in range(NUM_FEATURES)])
+
+    labels = [label for label, _features in rows]
+    feature_rows = np.vstack([features for _label, features in rows])
+    feature_df = pd.DataFrame(feature_rows, columns=[f"f{i}" for i in range(NUM_FEATURES)])
+    df = pd.concat([pd.DataFrame({"label": labels}), feature_df], axis=1)
+    after = len(rows)
 
     if after < before:
         print(f"Dropped {before - after} invalid/old-label rows ({before} -> {after}).")
@@ -186,6 +203,8 @@ def main():
     metadata = {
         "trained_at": datetime.now(timezone.utc).isoformat(),
         "csv_path": CSV_PATH,
+        "input_features": int(X.shape[1]),
+        "max_hands": 2,
         "labels": labels,
         "sample_counts": {label: int(label_counts[label]) for label in labels},
         "validation_accuracy": float(val_acc),

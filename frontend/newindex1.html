@@ -1772,7 +1772,7 @@
                                     loaded</span>
                             </div>
                             <p style="font-size:11.5px;color:var(--muted);margin-top:12px;line-height:1.5;">
-                                Expects a model that takes 63 numbers (21 hand landmarks × x,y,z, flattened) and outputs
+                                Expects a model that takes 126 numbers (up to 2 hands × 21 landmarks × x,y,z) and outputs
                                 class probabilities matching the label list above.
                                 The host must send CORS headers (<code>Access-Control-Allow-Origin</code>) or the
                                 browser will block the fetch — this is a browser security rule, not something this page
@@ -2065,7 +2065,21 @@
         document.getElementById('dash-view-model').onclick = () => switchView('model');
 
         // ---------- BACKEND (TensorFlow) ENGINE INTEGRATION ----------
-        let BACKEND_URL = '';
+        const RENDER_BACKEND_URL = 'https://hand-sign-gesture.onrender.com';
+        function resolveBackendUrl(inputValue = '') {
+            const manual = inputValue.trim().replace(/\/+$/, '');
+            if (manual) return manual;
+            const host = window.location.hostname;
+            if (window.location.protocol === 'file:') return 'http://127.0.0.1:5000';
+            if (host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.')) return '';
+            if (host.endsWith('onrender.com')) return '';
+            return RENDER_BACKEND_URL;
+        }
+        let BACKEND_URL = resolveBackendUrl();
+        const backendUrlInput = document.getElementById('backend-url-input');
+        if (backendUrlInput) {
+            backendUrlInput.placeholder = BACKEND_URL || 'same origin';
+        }
         let detectionEngine = 'browser';   // 'browser' | 'server' | 'custom'
         let backendGestures = [];
         let lastBackendCallAt = 0;
@@ -2335,22 +2349,22 @@
             }
         }
         document.getElementById('check-backend-btn').onclick = () => {
-            BACKEND_URL = document.getElementById('backend-url-input').value.trim();
+            BACKEND_URL = resolveBackendUrl(document.getElementById('backend-url-input').value);
             checkBackendHealth();
         };
 
-        async function backendPredict(handLandmarks) {
+        async function backendPredict(handsLandmarks) {
             if (backendBusy) return null;
             const now = performance.now();
             if (now - lastBackendCallAt < BACKEND_THROTTLE_MS) return null;
             lastBackendCallAt = now;
             backendBusy = true;
             try {
-                const landmarks = handLandmarks.map(p => [p.x, p.y, p.z]);
+                const hands = (handsLandmarks || []).slice(0, 2).map(hand => hand.map(p => [p.x, p.y, p.z]));
                 const res = await fetch(`${BACKEND_URL}/api/predict`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ landmarks })
+                    body: JSON.stringify({ hands })
                 });
                 const data = await res.json();
                 if (data.error || !data.label || data.matched === false) return null;
@@ -3066,8 +3080,7 @@
         }
 
         async function onResultsWordsServer(results) {
-            const lm = results.multiHandLandmarks[0];
-            const prediction = await backendPredict(lm);
+            const prediction = await backendPredict(results.multiHandLandmarks);
 
             const nowMs = performance.now();
             if (prediction) {
