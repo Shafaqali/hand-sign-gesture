@@ -39,6 +39,9 @@ backend/data/*
 !backend/data/.gitkeep
 backend/model/*
 !backend/model/.gitkeep
+!backend/model/gesture_model.h5
+!backend/model/labels.json
+!backend/model/training_metadata.json
 
 # Logs and temporary files
 *.log
