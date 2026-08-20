@@ -1,0 +1,3341 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MR Voxa — Sign Language Studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js" crossorigin="anonymous"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+    <style>
+        :root {
+            --ink: #071C4A;
+            --paper: #F4F8FF;
+            --paper-line: #D5E6FF;
+            --viewfinder: #071A3D;
+            --viewfinder-grid: #123B75;
+            --teal: #128AF4;
+            --coral: #063DAD;
+            --muted: #8FA8CF;
+            --muted-paper: #60789D;
+            --danger: #E85C5C;
+            --ok: #3FD08C;
+            --sidebar-w: 220px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--ink);
+            color: #EDEFF4;
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ===== SHELL / SIDEBAR ===== */
+        .shell {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: var(--sidebar-w);
+            flex-shrink: 0;
+            background: #0A1730;
+            border-right: 1px solid #172749;
+            display: flex;
+            flex-direction: column;
+            padding: 20px 14px;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+        }
+
+        .sb-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 4px 18px;
+            border-bottom: 1px solid #172749;
+            margin-bottom: 16px;
+        }
+
+        .sb-brand img {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            object-fit: cover;
+            border: 1px solid #223763;
+        }
+
+        .sb-brand-text {
+            line-height: 1.15;
+        }
+
+        .sb-brand-text b {
+            font-family: 'Fraunces', serif;
+            font-size: 16px;
+            font-weight: 600;
+            display: block;
+        }
+
+        .sb-brand-text span {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9.5px;
+            color: var(--teal);
+            letter-spacing: .1em;
+            text-transform: uppercase;
+        }
+
+        .sb-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--muted);
+            padding: 0 4px 16px;
+        }
+
+        .sb-status .sdot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--muted);
+            flex-shrink: 0;
+        }
+
+        .sb-status .sdot.on {
+            background: var(--ok);
+            box-shadow: 0 0 0 3px rgba(63, 208, 140, .16);
+        }
+
+        .sb-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            flex: 1;
+        }
+
+        .sb-item {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            color: #B7C2DA;
+            font-size: 13.5px;
+            font-weight: 500;
+            border: 1px solid transparent;
+            user-select: none;
+        }
+
+        .sb-item .ic {
+            width: 18px;
+            text-align: center;
+            font-size: 15px;
+            flex-shrink: 0;
+        }
+
+        .sb-item:hover {
+            background: #101F42;
+            color: #EDEFF4;
+        }
+
+        .sb-item.active {
+            background: linear-gradient(135deg, rgba(18, 138, 244, .22), rgba(6, 61, 173, .22));
+            color: #fff;
+            border-color: rgba(18, 138, 244, .35);
+        }
+
+        .sb-item .badge-count {
+            margin-left: auto;
+            background: #172749;
+            color: var(--teal);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9.5px;
+            padding: 1px 6px;
+            border-radius: 20px;
+        }
+
+        .sb-foot {
+            border-top: 1px solid #172749;
+            padding-top: 14px;
+            margin-top: 10px;
+        }
+
+        .sb-theme {
+            display: flex;
+            gap: 6px;
+            background: #101F42;
+            padding: 4px;
+            border-radius: 9px;
+        }
+
+        .sb-theme button {
+            flex: 1;
+            border: none;
+            background: transparent;
+            color: var(--muted);
+            padding: 6px 0;
+            border-radius: 6px;
+            font-size: 11.5px;
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .sb-theme button.active {
+            background: var(--teal);
+            color: #fff;
+        }
+
+        .content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .app {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 26px 24px 60px;
+        }
+
+        .view {
+            display: none;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        .page-head {
+            margin-bottom: 20px;
+        }
+
+        .page-eyebrow {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+            color: var(--teal);
+            margin: 0 0 6px;
+        }
+
+        .page-title {
+            font-family: 'Fraunces', serif;
+            font-weight: 600;
+            font-size: clamp(24px, 3vw, 32px);
+            margin: 0;
+            letter-spacing: -.01em;
+        }
+
+        .page-sub {
+            color: var(--muted);
+            font-size: 13.5px;
+            max-width: 640px;
+            margin-top: 6px;
+            line-height: 1.55;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1.05fr 0.95fr;
+            gap: 18px;
+        }
+
+        @media (max-width:900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width:820px) {
+            .shell {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+                flex-direction: row;
+                align-items: center;
+                overflow-x: auto;
+            }
+
+            .sb-brand {
+                border: none;
+                margin: 0;
+                padding: 0 10px 0 0;
+            }
+
+            .sb-nav {
+                flex-direction: row;
+            }
+
+            .sb-foot {
+                display: none;
+            }
+
+            .sb-status {
+                display: none;
+            }
+        }
+
+        .panel {
+            border-radius: 18px;
+            overflow: hidden;
+        }
+
+        /* VIEWFINDER */
+        .viewfinder {
+            background: var(--viewfinder);
+            border: 1px solid #1E2431;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .vf-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 16px 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: #6C7689;
+            letter-spacing: .06em;
+        }
+
+        .vf-head .dot {
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--muted);
+            margin-right: 6px;
+        }
+
+        .vf-head .dot.live {
+            background: #128AF4;
+            box-shadow: 0 0 0 3px rgba(18, 138, 244, .18);
+        }
+
+        .stage {
+            position: relative;
+            aspect-ratio: 4/3;
+            background:
+                linear-gradient(var(--viewfinder-grid) 1px, transparent 1px) 0 0/100% 33.3%,
+                linear-gradient(90deg, var(--viewfinder-grid) 1px, transparent 1px) 0 0/33.3% 100%,
+                #05070A;
+            margin: 0 12px;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        video,
+        canvas.overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        video {
+            transform: scaleX(-1);
+        }
+
+        canvas.overlay {
+            transform: scaleX(-1);
+        }
+
+        .stage-empty {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            color: #4A5164;
+            text-align: center;
+            padding: 24px;
+        }
+
+        .stage-empty button {
+            background: var(--teal);
+            color: #fff;
+            border: none;
+            padding: 11px 22px;
+            border-radius: 9px;
+            font-weight: 600;
+            font-size: 13.5px;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: #A9D9FF;
+            pointer-events: none;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, .8);
+        }
+
+        .hud .badge {
+            background: rgba(7, 26, 61, .62);
+            border: 1px solid rgba(18, 138, 244, .34);
+            padding: 3px 8px;
+            border-radius: 6px;
+        }
+
+        .vf-controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding: 14px 16px 16px;
+        }
+
+        .vf-controls button,
+        .vf-controls select {
+            background: #171C26;
+            border: 1px solid #2A3040;
+            color: #D7DBE4;
+            padding: 8px 12px;
+            border-radius: 9px;
+            font-size: 12.5px;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .vf-controls button:hover {
+            border-color: var(--teal);
+        }
+
+        .vf-controls button.danger {
+            border-color: #4A2A2A;
+            color: #F0A0A0;
+        }
+
+        .conf-meter {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            padding: 0 16px 14px;
+        }
+
+        .conf-meter .bar {
+            flex: 1;
+            height: 5px;
+            background: #1B212C;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .conf-meter .bar i {
+            display: block;
+            height: 100%;
+            background: linear-gradient(90deg, var(--coral), var(--teal));
+            width: 0%;
+            transition: width .15s;
+        }
+
+        .conf-meter span {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--muted);
+            width: 44px;
+            text-align: right;
+        }
+
+        /* TRANSCRIPT (paper) */
+        .transcript {
+            background: var(--paper);
+            color: var(--ink);
+            border: 1px solid #D5E6FF;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .t-head {
+            padding: 16px 18px 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+        }
+
+        .t-head h2 {
+            font-family: 'Fraunces', serif;
+            font-size: 18px;
+            margin: 0;
+            font-weight: 600;
+        }
+
+        .t-head span {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10.5px;
+            color: var(--muted-paper);
+        }
+
+        .sentence-box {
+            margin: 6px 18px 10px;
+            min-height: 120px;
+            background: #FAFCFF;
+            border: 1px dashed #A9CFFF;
+            border-radius: 12px;
+            padding: 16px 18px;
+            font-family: 'Fraunces', serif;
+            font-size: 22px;
+            line-height: 1.5;
+            color: #2A2F1E;
+        }
+
+        .sentence-box .placeholder {
+            color: #8EA7CA;
+            font-style: italic;
+            font-size: 16px;
+        }
+
+        .word-chip {
+            display: inline-block;
+            position: relative;
+            padding: 0 2px;
+        }
+
+        .word-chip::after {
+            content: '';
+            position: absolute;
+            left: 2px;
+            right: 2px;
+            bottom: 1px;
+            height: 5px;
+            background: rgba(18, 138, 244, .22);
+            z-index: -1;
+            border-radius: 2px;
+        }
+
+        .t-actions {
+            display: flex;
+            gap: 8px;
+            padding: 0 18px 14px;
+            flex-wrap: wrap;
+        }
+
+        .t-actions button {
+            background: #EAF4FF;
+            border: 1px solid #C9E0FF;
+            color: #071C4A;
+            padding: 7px 13px;
+            border-radius: 8px;
+            font-size: 12px;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
+        }
+
+        .t-actions button:hover {
+            background: #DCEEFF;
+        }
+
+        .t-actions button.primary {
+            background: var(--ink);
+            color: var(--paper);
+            border-color: var(--ink);
+        }
+
+        .divider {
+            height: 1px;
+            background: var(--paper-line);
+            margin: 2px 18px;
+        }
+
+        .controls-section {
+            padding: 12px 18px;
+        }
+
+        .controls-section h3 {
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            font-size: 10.5px;
+            letter-spacing: .1em;
+            color: var(--muted-paper);
+            margin: 0 0 10px;
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 9px;
+            flex-wrap: wrap;
+        }
+
+        .row label {
+            font-size: 12.5px;
+            color: #496486;
+            width: 88px;
+            flex-shrink: 0;
+        }
+
+        .row select,
+        .row input[type=range],
+        .row input[type=text] {
+            flex: 1;
+            min-width: 100px;
+        }
+
+        select,
+        input[type=text] {
+            background: #FAFCFF;
+            border: 1px solid #C9E0FF;
+            border-radius: 7px;
+            padding: 6px 8px;
+            font-size: 12.5px;
+            color: var(--ink);
+            font-family: 'Inter', sans-serif;
+        }
+
+        input[type=range] {
+            accent-color: var(--coral);
+        }
+
+        .mute-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .mute-row button {
+            background: #FAFCFF;
+            border: 1px solid #C9E0FF;
+            border-radius: 7px;
+            padding: 6px 10px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .mute-row button.active {
+            background: var(--coral);
+            color: #fff;
+            border-color: var(--coral);
+        }
+
+        .translation-line {
+            padding: 0 18px 14px;
+            font-family: 'Fraunces', serif;
+            font-style: italic;
+            font-size: 15px;
+            color: #47698F;
+            min-height: 20px;
+        }
+
+        .natural-line {
+            padding: 0 18px 6px;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            color: #173B70;
+            min-height: 18px;
+        }
+
+        .natural-line b {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 500;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: var(--muted-paper);
+            margin-right: 6px;
+        }
+
+        .convo-line {
+            background: #171C26;
+            border: 1px solid #232936;
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+        }
+
+        .convo-text {
+            font-size: 13.5px;
+            color: #EDEFF4;
+            line-height: 1.4;
+        }
+
+        .convo-meta {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+
+        body.light .convo-line {
+            background: #F4F8FF;
+            border-color: #D5E6FF;
+        }
+
+        body.light .convo-text {
+            color: var(--ink);
+        }
+
+        body.light .convo-meta {
+            color: #60789D;
+        }
+
+        /* CARDS / DASHBOARD */
+        .bottom-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr 1fr;
+            gap: 18px;
+            margin-top: 18px;
+        }
+
+        @media (max-width:1100px) {
+            .bottom-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width:640px) {
+            .bottom-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: #1C212C;
+            border: 1px solid #2A3040;
+            border-radius: 16px;
+            padding: 18px;
+        }
+
+        .card h3 {
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: .1em;
+            color: var(--muted);
+            margin: 0 0 14px;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .stat-grid.dash {
+            grid-template-columns: repeat(6, 1fr);
+        }
+
+        @media (max-width:1000px) {
+            .stat-grid.dash {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        .stat {
+            background: #171C26;
+            border-radius: 11px;
+            padding: 12px 10px;
+            text-align: left;
+        }
+
+        .stat .num {
+            font-family: 'Fraunces', serif;
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--teal);
+        }
+
+        .stat .lbl {
+            font-size: 10.5px;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12.5px;
+        }
+
+        th {
+            text-align: left;
+            color: var(--muted);
+            font-weight: 500;
+            font-size: 10.5px;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            padding: 6px 6px;
+            border-bottom: 1px solid #2A3040;
+        }
+
+        td {
+            padding: 7px 6px;
+            border-bottom: 1px solid #232936;
+            color: #D7DBE4;
+        }
+
+        td.conf {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--teal);
+        }
+
+        .hist-empty {
+            color: var(--muted);
+            font-size: 12.5px;
+            padding: 20px 0;
+            text-align: center;
+        }
+
+        .hist-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .hist-actions button {
+            background: #171C26;
+            border: 1px solid #2A3040;
+            color: #D7DBE4;
+            padding: 7px 12px;
+            border-radius: 8px;
+            font-size: 11.5px;
+            cursor: pointer;
+        }
+
+        .hist-actions button.active {
+            background: var(--teal);
+            color: #fff;
+            border-color: var(--teal);
+        }
+
+        .note {
+            margin-top: 18px;
+            font-size: 11.5px;
+            color: #6C7689;
+            line-height: 1.6;
+            background: #171C26;
+            border: 1px solid #232936;
+            border-radius: 12px;
+            padding: 14px 16px;
+        }
+
+        .note b {
+            color: #9BA4B5;
+        }
+
+        /* DASHBOARD extras */
+        .dash-top {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+
+        @media (max-width:900px) {
+            .dash-top {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+
+        .quick-actions button {
+            background: var(--teal);
+            border: none;
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 9px;
+            font-size: 12.5px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .quick-actions button.ghost {
+            background: #171C26;
+            border: 1px solid #2A3040;
+            color: #D7DBE4;
+        }
+
+        .bar-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 9px;
+        }
+
+        .bar-row .bl {
+            width: 70px;
+            font-size: 11.5px;
+            color: var(--muted);
+            flex-shrink: 0;
+        }
+
+        .bar-row .bt {
+            flex: 1;
+            height: 9px;
+            background: #171C26;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .bar-row .bt i {
+            display: block;
+            height: 100%;
+            background: linear-gradient(90deg, var(--coral), var(--teal));
+        }
+
+        .bar-row .bv {
+            width: 32px;
+            text-align: right;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--teal);
+        }
+
+        /* MODEL VIEW */
+        .model-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+        }
+
+        @media (max-width:900px) {
+            .model-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .field {
+            margin-bottom: 12px;
+        }
+
+        .field label {
+            display: block;
+            font-size: 11.5px;
+            color: var(--muted);
+            margin-bottom: 5px;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+        }
+
+        .field input[type=text],
+        .field textarea {
+            width: 100%;
+            background: #171C26;
+            border: 1px solid #2A3040;
+            color: #EDEFF4;
+            padding: 9px 11px;
+            border-radius: 8px;
+            font-size: 12.5px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .field textarea {
+            min-height: 64px;
+            resize: vertical;
+        }
+
+        .btn {
+            background: var(--teal);
+            border: none;
+            color: #fff;
+            padding: 9px 16px;
+            border-radius: 8px;
+            font-size: 12.5px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .btn.secondary {
+            background: #171C26;
+            border: 1px solid #2A3040;
+            color: #D7DBE4;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            padding: 5px 10px;
+            border-radius: 20px;
+            background: #171C26;
+            border: 1px solid #2A3040;
+            color: var(--muted);
+        }
+
+        .status-pill .d {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        .status-pill.ok {
+            color: var(--ok);
+            border-color: rgba(63, 208, 140, .3);
+        }
+
+        .status-pill.ok .d {
+            background: var(--ok);
+        }
+
+        .status-pill.err {
+            color: var(--danger);
+            border-color: rgba(232, 92, 92, .3);
+        }
+
+        .status-pill.err .d {
+            background: var(--danger);
+        }
+
+        .engine-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 6px;
+        }
+
+        .engine-opt {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 11px 13px;
+            border-radius: 10px;
+            border: 1px solid #2A3040;
+            background: #171C26;
+            cursor: pointer;
+        }
+
+        .engine-opt.active {
+            border-color: var(--teal);
+            background: rgba(18, 138, 244, .1);
+        }
+
+        .engine-opt b {
+            font-size: 13px;
+        }
+
+        .engine-opt span {
+            display: block;
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+
+        /* ABOUT VIEW */
+        .about-hero {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            background: #1C212C;
+            border: 1px solid #2A3040;
+            border-radius: 18px;
+            padding: 24px;
+            margin-bottom: 18px;
+        }
+
+        .about-hero img {
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            object-fit: cover;
+            border: 1px solid #2A3040;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+            margin: 18px 0;
+        }
+
+        @media (max-width:900px) {
+            .feature-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width:600px) {
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .feature-card {
+            background: #1C212C;
+            border: 1px solid #2A3040;
+            border-radius: 14px;
+            padding: 16px;
+        }
+
+        .feature-card .fic {
+            font-size: 20px;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .feature-card h4 {
+            margin: 0 0 6px;
+            font-size: 13.5px;
+            font-family: 'Fraunces', serif;
+            font-weight: 600;
+        }
+
+        .feature-card p {
+            margin: 0;
+            font-size: 12px;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .stack-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .stack-chip {
+            background: #171C26;
+            border: 1px solid #2A3040;
+            color: #D7DBE4;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 11.5px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* LIGHT THEME OVERRIDE */
+        body.light {
+            background: #F3F8FF;
+        }
+
+        body.light .sidebar {
+            background: #fff;
+            border-color: #D5E6FF;
+        }
+
+        body.light .sb-brand {
+            border-color: #D5E6FF;
+        }
+
+        body.light .sb-brand-text b {
+            color: var(--ink);
+        }
+
+        body.light .sb-item {
+            color: #3A4B6B;
+        }
+
+        body.light .sb-item:hover {
+            background: #EAF4FF;
+            color: var(--ink);
+        }
+
+        body.light .sb-item.active {
+            background: linear-gradient(135deg, rgba(18, 138, 244, .12), rgba(6, 61, 173, .1));
+            color: var(--ink);
+        }
+
+        body.light .sb-theme {
+            background: #EAF4FF;
+        }
+
+        body.light .sb-status {
+            color: #60789D;
+        }
+
+        body.light .sb-foot {
+            border-color: #D5E6FF;
+        }
+
+        body.light .card {
+            background: #fff;
+            border-color: #D5E6FF;
+        }
+
+        body.light .card h3 {
+            color: #60789D;
+        }
+
+        body.light .stat {
+            background: #F4F8FF;
+        }
+
+        body.light .stat .lbl {
+            color: #60789D;
+        }
+
+        body.light td {
+            color: #3A3628;
+            border-bottom-color: #EAE2CC;
+        }
+
+        body.light th {
+            color: #60789D;
+            border-bottom-color: #D5E6FF;
+        }
+
+        body.light .note {
+            background: #fff;
+            border-color: #D5E6FF;
+            color: #60789D;
+        }
+
+        body.light .note b {
+            color: #071C4A;
+        }
+
+        body.light .hist-actions button {
+            background: #F4F8FF;
+            border-color: #D5E6FF;
+            color: #071C4A;
+        }
+
+        body.light h1,
+        body.light .page-title,
+        body.light .sub,
+        body.light .page-sub {
+            color: var(--ink);
+        }
+
+        body.light .quick-actions button.ghost {
+            background: #F4F8FF;
+            border-color: #D5E6FF;
+            color: #071C4A;
+        }
+
+        body.light .field input[type=text],
+        body.light .field textarea {
+            background: #F4F8FF;
+            border-color: #D5E6FF;
+            color: var(--ink);
+        }
+
+        body.light .btn.secondary {
+            background: #F4F8FF;
+            border-color: #D5E6FF;
+            color: #071C4A;
+        }
+
+        body.light .status-pill {
+            background: #F4F8FF;
+            border-color: #D5E6FF;
+        }
+
+        body.light .engine-opt {
+            background: #F4F8FF;
+            border-color: #D5E6FF;
+        }
+
+        body.light .about-hero,
+        body.light .feature-card {
+            background: #fff;
+            border-color: #D5E6FF;
+        }
+
+        body.light .feature-card p {
+            color: #60789D;
+        }
+
+        body.light .stack-chip {
+            background: #F4F8FF;
+            border-color: #D5E6FF;
+            color: #071C4A;
+        }
+
+        body.light .bar-row .bt {
+            background: #EAF4FF;
+        }
+
+        /* HISTORY MODAL kept for quick jump, but full history now lives in its own view */
+        .history-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(5, 7, 10, .7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            z-index: 20;
+        }
+
+        .history-modal.open {
+            display: flex;
+        }
+
+        .history-dialog {
+            width: min(860px, 100%);
+            max-height: 86vh;
+            overflow: auto;
+            background: #1C212C;
+            border: 1px solid #2A3040;
+            border-radius: 14px;
+            padding: 18px;
+            color: #EDEFF4;
+            box-shadow: 0 18px 60px rgba(0, 0, 0, .35);
+        }
+
+        .history-dialog-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .history-dialog-head h3 {
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: .1em;
+            color: var(--muted);
+            margin: 0;
+        }
+
+        .history-dialog-head button,
+        .history-refresh {
+            background: #171C26;
+            border: 1px solid #2A3040;
+            color: #D7DBE4;
+            padding: 7px 12px;
+            border-radius: 8px;
+            font-size: 11.5px;
+            cursor: pointer;
+        }
+
+        .history-section-title {
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            font-size: 10.5px;
+            letter-spacing: .1em;
+            color: var(--teal);
+            margin: 14px 0 8px;
+        }
+
+        .saved-row {
+            border-bottom: 1px solid #2A3040;
+            padding: 8px 0;
+            font-size: 12.5px;
+            line-height: 1.4;
+        }
+
+        .saved-row b {
+            color: #EDEFF4;
+        }
+
+        .saved-row span {
+            color: var(--muted);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10.5px;
+        }
+
+        body.light .history-dialog {
+            background: #fff;
+            border-color: #D5E6FF;
+            color: var(--ink);
+        }
+
+        body.light .history-dialog-head button,
+        body.light .history-refresh {
+            background: #F4F8FF;
+            border-color: #D5E6FF;
+            color: #071C4A;
+        }
+
+        body.light .saved-row {
+            border-bottom-color: #EAE2CC;
+        }
+
+        body.light .saved-row b {
+            color: var(--ink);
+        }
+
+        .search-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-row input[type=text] {
+            flex: 1;
+            min-width: 180px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="shell">
+
+        <!-- ===== SIDEBAR ===== -->
+        <nav class="sidebar">
+            <div class="sb-brand">
+                <img src="LOGO_PLACEHOLDER" alt="MR Voxa logo">
+                <div class="sb-brand-text">
+                    <b>MR Voxa</b>
+                    <span>Sign Studio</span>
+                </div>
+            </div>
+            <div class="sb-status">
+                <span class="sdot" id="sb-cam-dot"></span>
+                <span id="sb-cam-text">Camera off</span>
+            </div>
+            <div class="sb-nav" id="sb-nav">
+                <div class="sb-item active" data-view="dashboard"><span class="ic">◆</span>Dashboard</div>
+                <div class="sb-item" data-view="detect"><span class="ic">✋</span>Live Detect</div>
+                <div class="sb-item" data-view="history"><span class="ic">☰</span>History<span class="badge-count"
+                        id="sb-history-count">0</span></div>
+                <div class="sb-item" data-view="model"><span class="ic">⌘</span>Model &amp; Engine</div>
+                <div class="sb-item" data-view="about"><span class="ic">i</span>About</div>
+            </div>
+            <div class="sb-foot">
+                <div class="sb-theme">
+                    <button id="theme-dark" class="active">Dark</button>
+                    <button id="theme-light">Light</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- ===== MAIN CONTENT ===== -->
+        <div class="content">
+            <div class="app">
+
+                <!-- ================= DASHBOARD VIEW ================= -->
+                <div class="view active" id="view-dashboard">
+                    <div class="page-head">
+                        <p class="page-eyebrow">● Overview</p>
+                        <h1 class="page-title">Dashboard</h1>
+                        <p class="page-sub">A live snapshot of your signing session — camera status, running totals, and
+                            what's been detected most recently. Head to <b>Live Detect</b> to start signing.</p>
+                    </div>
+
+                    <div class="dash-top">
+                        <div class="card">
+                            <h3>Session totals</h3>
+                            <div class="stat-grid dash">
+                                <div class="stat">
+                                    <div class="num" id="d-stat-total">0</div>
+                                    <div class="lbl">Total gestures</div>
+                                </div>
+                                <div class="stat">
+                                    <div class="num" id="d-stat-today">0</div>
+                                    <div class="lbl">Today</div>
+                                </div>
+                                <div class="stat">
+                                    <div class="num" id="d-stat-avgconf">0%</div>
+                                    <div class="lbl">Avg. confidence</div>
+                                </div>
+                                <div class="stat">
+                                    <div class="num" id="d-stat-sentences">0</div>
+                                    <div class="lbl">Sentences formed</div>
+                                </div>
+                                <div class="stat">
+                                    <div class="num" id="d-stat-hands">0</div>
+                                    <div class="lbl">Hands tracked now</div>
+                                </div>
+                                <div class="stat">
+                                    <div class="num" id="d-stat-fps">0</div>
+                                    <div class="lbl">Camera FPS</div>
+                                </div>
+                            </div>
+                            <div class="quick-actions">
+                                <button id="dash-start-cam">▶ Go to Live Detect</button>
+                                <button class="ghost" id="dash-view-history">View history</button>
+                                <button class="ghost" id="dash-view-model">Configure model</button>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3>Engine status</h3>
+                            <div id="dash-engine-pill"><span class="status-pill"><span class="d"></span>Browser rules
+                                    engine</span></div>
+                            <div style="margin-top:14px;">
+                                <div class="row" style="margin-bottom:6px;"><label
+                                        style="width:auto;color:var(--muted);font-size:11.5px;">Mode</label></div>
+                                <div id="dash-mode-text" style="font-family:'Fraunces',serif;font-size:16px;">Word signs
+                                </div>
+                            </div>
+                            <div style="margin-top:14px;">
+                                <div class="row" style="margin-bottom:6px;"><label
+                                        style="width:auto;color:var(--muted);font-size:11.5px;">Firebase sync</label>
+                                </div>
+                                <div id="dash-firebase-text"
+                                    style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--muted);">
+                                    Checking…</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bottom-grid">
+                        <div class="card">
+                            <h3>Most-used signs</h3>
+                            <div id="dash-top-signs">
+                                <div class="hist-empty">No detections yet.</div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3>Recent activity</h3>
+                            <div id="dash-recent">
+                                <div class="hist-empty">Nothing detected yet — start signing in Live Detect.</div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3>Recent conversation</h3>
+                            <div id="dash-recent-convo">
+                                <div class="hist-empty">Finished sentences will appear here.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= LIVE DETECT VIEW ================= -->
+                <div class="view" id="view-detect">
+                    <div class="page-head">
+                        <p class="page-eyebrow">● Camera-based · Runs entirely in this browser tab</p>
+                        <h1 class="page-title">Live Detect</h1>
+                        <p class="page-sub">Live hand tracking turns hand shapes into text, then reads them aloud.
+                            Switch between <b>Word Signs</b> (whole-word gestures like Hello, Thank you, Help) and
+                            <b>Alphabet</b> (A–Z fingerspelling) on the right.</p>
+                    </div>
+
+                    <div class="grid">
+                        <!-- VIEWFINDER -->
+                        <div class="panel viewfinder">
+                            <div class="vf-head">
+                                <span><span class="dot" id="live-dot"></span>VIEWFINDER</span>
+                                <span id="fps-counter">-- FPS</span>
+                            </div>
+                            <div class="stage" id="stage">
+                                <video id="video" playsinline muted></video>
+                                <canvas class="overlay" id="overlay"></canvas>
+                                <div class="hud" id="hud" style="display:none;">
+                                    <span class="badge" id="hands-badge">0 hands</span>
+                                    <span class="badge" id="gesture-badge">—</span>
+                                </div>
+                                <div class="stage-empty" id="stage-empty">
+                                    <span style="font-size:28px;">✋</span>
+                                    <p style="max-width:260px;margin:0;">Turn on your camera to start tracking hand
+                                        landmarks in real time.</p>
+                                    <button id="start-cam">Enable camera</button>
+                                </div>
+                            </div>
+                            <div class="conf-meter">
+                                <span>Confidence</span>
+                                <div class="bar"><i id="conf-bar"></i></div>
+                                <span id="conf-val">0%</span>
+                            </div>
+                            <div class="vf-controls">
+                                <button id="switch-cam">↺ Switch camera</button>
+                                <select id="mode-select">
+                                    <option value="live">Live detection</option>
+                                    <option value="paused">Paused</option>
+                                </select>
+                                <select id="engine-select" title="Choose which classifier decides the sign">
+                                    <option value="browser">Engine: Browser (rules)</option>
+                                    <option value="server">Engine: Server AI (TensorFlow)</option>
+                                    <option value="custom">Engine: Custom model (URL)</option>
+                                </select>
+                                <button id="stop-cam" class="danger">Stop camera</button>
+                            </div>
+                            <div id="engine-status"
+                                style="padding:0 16px 12px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--muted);">
+                            </div>
+                        </div>
+
+                        <!-- TRANSCRIPT -->
+                        <div class="panel transcript">
+                            <div class="t-head">
+                                <h2>Transcript</h2>
+                                <div class="sb-theme" id="mode-tabs" style="background:#EAF4FF;">
+                                    <button id="mode-word-btn" class="active">Word signs</button>
+                                    <button id="mode-alpha-btn">Alphabet</button>
+                                </div>
+                            </div>
+
+                            <!-- WORD-SIGN MODE -->
+                            <div id="words-panel">
+                                <div class="t-head" style="padding-top:2px;">
+                                    <span></span>
+                                    <span id="word-count">0 words</span>
+                                </div>
+                                <div class="sentence-box" id="sentence-box">
+                                    <span class="placeholder">Detected signs will appear here as words…</span>
+                                </div>
+                                <div class="natural-line" id="natural-line"></div>
+                                <div class="translation-line" id="translation-line"></div>
+                                <div class="t-actions">
+                                    <button id="undo-btn">Undo</button>
+                                    <button id="delete-last-btn">Delete last</button>
+                                    <button id="clear-btn">Clear</button>
+                                    <button id="copy-btn" class="primary">Copy text</button>
+                                </div>
+                            </div>
+
+                            <!-- ALPHABET / FINGERSPELLING MODE -->
+                            <div id="alphabet-panel" style="display:none;">
+                                <div class="t-head" style="padding-top:2px;">
+                                    <span></span>
+                                    <span id="letter-count">0 letters</span>
+                                </div>
+                                <div class="sentence-box" id="alphabet-box">
+                                    <span class="placeholder">Fingerspelled letters will appear here — hold each letter
+                                        steady for a moment…</span>
+                                </div>
+                                <div class="natural-line" id="alpha-hint">Hold a letter shape steady to register it. A
+                                    short pause auto-adds a space; a longer pause finalizes the line below.</div>
+                                <div class="t-actions">
+                                    <button id="space-btn">Space</button>
+                                    <button id="backspace-btn">Backspace</button>
+                                    <button id="clear-alpha-btn">Clear</button>
+                                    <button id="copy-alpha-btn" class="primary">Copy text</button>
+                                </div>
+                            </div>
+
+                            <div class="divider"></div>
+
+                            <div class="controls-section">
+                                <h3>Speech</h3>
+                                <div class="row">
+                                    <label>Voice</label>
+                                    <select id="voice-select"></select>
+                                </div>
+                                <div class="row">
+                                    <label>Language</label>
+                                    <select id="lang-select">
+                                        <option value="en">English</option>
+                                        <option value="hi">Hindi (translation only)</option>
+                                        <option value="mr">Marathi (translation only)</option>
+                                        <option value="gu">Gujarati (translation only)</option>
+                                        <option value="ur">Urdu (translation only)</option>
+                                    </select>
+                                </div>
+                                <div class="row">
+                                    <label>Speed</label>
+                                    <input type="range" id="rate-range" min="0.5" max="1.8" step="0.1" value="1">
+                                </div>
+                                <div class="row">
+                                    <label>Volume</label>
+                                    <input type="range" id="vol-range" min="0" max="1" step="0.1" value="1">
+                                </div>
+                                <div class="row">
+                                    <label>Playback</label>
+                                    <div class="mute-row">
+                                        <button id="mute-btn">🔊 Speak on detect</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= HISTORY VIEW ================= -->
+                <div class="view" id="view-history">
+                    <div class="page-head">
+                        <p class="page-eyebrow">● Local session + Firebase sync</p>
+                        <h1 class="page-title">History</h1>
+                        <p class="page-sub">Every detected sign, every finished sentence, and — when Firebase is
+                            connected — the same data persisted across sessions.</p>
+                    </div>
+
+                    <div class="hist-actions" style="margin-bottom:16px;">
+                        <button id="hist-tab-detections" class="active">Detections</button>
+                        <button id="hist-tab-conversations">Conversations</button>
+                        <button id="hist-tab-saved">Saved (Firebase)</button>
+                        <span style="flex:1;"></span>
+                        <button id="export-csv">⬇ Export CSV</button>
+                        <button id="clear-history">Clear local history</button>
+                    </div>
+
+                    <!-- Detections table -->
+                    <div class="card" id="hist-panel-detections">
+                        <div class="search-row">
+                            <input type="text" id="hist-search" placeholder="Filter by sign / letter…">
+                            <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);"
+                                id="hist-count-text">0 entries</span>
+                        </div>
+                        <div id="history-wrap-full">
+                            <div class="hist-empty">No gestures detected yet — history will populate as you sign.</div>
+                        </div>
+                    </div>
+
+                    <!-- Conversation log -->
+                    <div class="card" id="hist-panel-conversations" style="display:none;">
+                        <div id="conversation-wrap-full">
+                            <div class="hist-empty">Finished sentences will appear here after a short pause between
+                                signs.</div>
+                        </div>
+                    </div>
+
+                    <!-- Saved (Firebase) -->
+                    <div class="card" id="hist-panel-saved" style="display:none;">
+                        <div class="hist-actions" style="margin-bottom:12px;">
+                            <button id="refresh-saved-history-2">Refresh from Firebase</button>
+                        </div>
+                        <div id="saved-history-content-2">
+                            <div class="hist-empty">Saved history will load from Firebase.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= MODEL VIEW ================= -->
+                <div class="view" id="view-model">
+                    <div class="page-head">
+                        <p class="page-eyebrow">● Recognition engine</p>
+                        <h1 class="page-title">Model &amp; Engine</h1>
+                        <p class="page-sub">Choose what decides a sign: the built-in geometric rules, a Flask +
+                            TensorFlow backend you run yourself, or a TensorFlow.js model you host online and import by
+                            URL.</p>
+                    </div>
+
+                    <div class="engine-list" id="engine-list-ui">
+                        <div class="engine-opt active" data-engine="browser">
+                            <span class="ic" style="font-size:18px;">◇</span>
+                            <div><b>Browser rules engine</b><span>Runs instantly, no setup. Geometric handshape rules
+                                    over MediaPipe landmarks.</span></div>
+                        </div>
+                        <div class="engine-opt" data-engine="server">
+                            <span class="ic" style="font-size:18px;">☁</span>
+                            <div><b>Server AI (your Flask backend)</b><span>Sends landmarks to a locally-run TensorFlow
+                                    model via <code>/api/predict</code>.</span></div>
+                        </div>
+                        <div class="engine-opt" data-engine="custom">
+                            <span class="ic" style="font-size:18px;">⇪</span>
+                            <div><b>Custom model — import from URL</b><span>Loads a TensorFlow.js model.json hosted
+                                    online, runs entirely in your browser.</span></div>
+                        </div>
+                    </div>
+
+                    <div class="model-grid" style="margin-top:20px;">
+                        <div class="card">
+                            <h3>Server AI backend</h3>
+                            <div class="field">
+                                <label>Backend base URL</label>
+                                <input type="text" id="backend-url-input" placeholder="http://localhost:5000">
+                            </div>
+                            <div id="engine-status-2"
+                                style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:10px;">
+                            </div>
+                            <button class="btn secondary" id="check-backend-btn">Check backend health</button>
+                            <p style="font-size:11.5px;color:var(--muted);margin-top:12px;line-height:1.5;">Needs
+                                <code>python app.py</code> running locally with a trained model (via
+                                <code>collect_data.py</code> + <code>train_model.py</code>). Same-origin or CORS-enabled
+                                only.</p>
+                        </div>
+
+                        <div class="card">
+                            <h3>Import a model online (TensorFlow.js)</h3>
+                            <div class="field">
+                                <label>Model.json URL</label>
+                                <input type="text" id="custom-model-url"
+                                    placeholder="https://your-host.com/model/model.json">
+                            </div>
+                            <div class="field">
+                                <label>Output labels (comma-separated, in model's output order)</label>
+                                <textarea id="custom-model-labels"
+                                    placeholder="hello, stop, yes, no, come, good, friend, sorry, love, ok, help, together, bye"></textarea>
+                            </div>
+                            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                                <button class="btn" id="load-custom-model-btn">Load model</button>
+                                <span class="status-pill" id="custom-model-status"><span class="d"></span>No model
+                                    loaded</span>
+                            </div>
+                            <p style="font-size:11.5px;color:var(--muted);margin-top:12px;line-height:1.5;">
+                                Expects a model that takes 63 numbers (21 hand landmarks × x,y,z, flattened) and outputs
+                                class probabilities matching the label list above.
+                                The host must send CORS headers (<code>Access-Control-Allow-Origin</code>) or the
+                                browser will block the fetch — this is a browser security rule, not something this page
+                                can bypass.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= ABOUT VIEW ================= -->
+                <div class="view" id="view-about">
+                    <div class="page-head">
+                        <p class="page-eyebrow">● About this build</p>
+                        <h1 class="page-title">About MR Voxa</h1>
+                        <p class="page-sub">What's real, what's simplified, and how the pieces fit together.</p>
+                    </div>
+
+                    <div class="about-hero">
+                        <img src="LOGO_PLACEHOLDER" alt="MR Voxa logo">
+                        <div>
+                            <h2 style="font-family:'Fraunces',serif;margin:0 0 6px;font-size:20px;">MR Voxa turns hand
+                                signs into spoken, written words — live, in the browser.</h2>
+                            <p style="margin:0;color:var(--muted);font-size:13px;line-height:1.55;max-width:640px;">It
+                                tracks 21 hand landmarks per hand with MediaPipe, classifies the handshape with
+                                geometric rules (or a model you supply), assembles recognized signs into sentences, and
+                                speaks them with the Web Speech API — with a running dashboard and history alongside.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="feature-grid">
+                        <div class="feature-card"><span class="fic">✋</span>
+                            <h4>13 word signs</h4>
+                            <p>Hello, Stop, Yes, No, Come, Good, Friend, Sorry, Love, Ok, Help, Together, Bye —
+                                including two-hand compounds and one motion-tracked sign (Bye).</p>
+                        </div>
+                        <div class="feature-card"><span class="fic">🔤</span>
+                            <h4>16 alphabet letters</h4>
+                            <p>A, B, C, D, F, I, J, L, O, S, U, V, W, X, Y, Z fingerspelling, with hold-time
+                                confirmation and auto-spacing between words.</p>
+                        </div>
+                        <div class="feature-card"><span class="fic">🗣</span>
+                            <h4>Sentence engine</h4>
+                            <p>A phrase-template engine fuses recognized signs (including repeats and 2–3 sign
+                                compounds) into a punctuated, spoken sentence.</p>
+                        </div>
+                        <div class="feature-card"><span class="fic">☁</span>
+                            <h4>Firebase history</h4>
+                            <p>Detections and finished sentences sync to Realtime Database per browser session, viewable
+                                from the History tab.</p>
+                        </div>
+                        <div class="feature-card"><span class="fic">⌘</span>
+                            <h4>Swappable engine</h4>
+                            <p>Run entirely on rules, point at your own Flask + TensorFlow backend, or import a
+                                TensorFlow.js model straight from a URL.</p>
+                        </div>
+                        <div class="feature-card"><span class="fic">🌐</span>
+                            <h4>Translation preview</h4>
+                            <p>A fixed-vocabulary lookup shows Hindi, Marathi, Gujarati and Urdu renderings of
+                                recognized sentences alongside the English original.</p>
+                        </div>
+                    </div>
+
+                    <div class="note">
+                        <b>What's real here:</b> live MediaPipe hand-landmark tracking (21 points/hand, both hands)
+                        feeding two independent rule-based geometric classifiers. <b>Word signs</b> mode recognizes 13
+                        whole-word signs — including two-hand compounds (Help, Together) and one motion-tracked sign
+                        (Bye, via wrist-trajectory wave detection) — and turns a run of them into a punctuated sentence
+                        through a phrase-template engine. <b>Alphabet</b> mode fingerspells 16 ASL letters (A, B, C, D,
+                        F, I, J, L, O, S, U, V, W, X, Y, Z) from static handshapes plus two motion-traced letters (J,
+                        Z), with a hold-time + rolling-buffer confirmation layer so a shape has to be held steadily
+                        before it registers, auto-spacing between words on a short pause, and line finalization into the
+                        Conversation log on a longer pause. Both modes share Web Speech API TTS, detection history, CSV
+                        export, and a fixed-vocabulary translation table.<br><br>
+                        <b>What's simplified:</b> both built-in modes are geometry-over-landmarks classifiers, not
+                        trained models — they recognize curated, clearly distinct handshapes rather than general
+                        ASL/ISL. Alphabet mode only covers 16 of the 26 letters; E, G, H, K, M, N, P, Q, R, and T are
+                        left out because they depend on fine thumb/finger overlap or wrist rotation that's unreliable to
+                        detect from 2D landmarks with simple geometric rules. J and Z rely on a coarse
+                        fingertip-trajectory heuristic, not real motion-sequence modelling, so they're the least
+                        reliable letters. The "natural sentence" text in Word signs mode is a hand-written phrase table
+                        over 13 known signs, not grammar inference. The new <b>Model &amp; Engine</b> tab lets you swap
+                        in a real trained model — either your own Flask + TensorFlow backend, or a TensorFlow.js model
+                        imported directly from a URL — for genuinely learned recognition instead of hand-written rules.
+                    </div>
+
+                    <div class="card" style="margin-top:18px;">
+                        <h3>Built with</h3>
+                        <div class="stack-row">
+                            <span class="stack-chip">MediaPipe Hands</span>
+                            <span class="stack-chip">TensorFlow.js</span>
+                            <span class="stack-chip">Web Speech API</span>
+                            <span class="stack-chip">Firebase Realtime DB</span>
+                            <span class="stack-chip">Vanilla JS</span>
+                            <span class="stack-chip">Fraunces + Inter + JetBrains Mono</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div class="history-modal" id="saved-history-modal">
+        <div class="history-dialog">
+            <div class="history-dialog-head">
+                <h3>Saved Firebase History</h3>
+                <button id="close-saved-history">Close</button>
+            </div>
+            <button class="history-refresh" id="refresh-saved-history">Refresh</button>
+            <div id="saved-history-content">
+                <div class="hist-empty">Saved history will load from Firebase.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const GESTURE_WORDS = {
+            hello: "Hello", stop: "Stop", yes: "Yes", no: "No",
+            come: "Come", good: "Good", friend: "Friend", sorry: "Sorry",
+            love: "Love", ok: "Ok", help: "Help", together: "Together", bye: "Bye"
+        };
+        const TRANSLATIONS = {
+            Hello: { hi: "नमस्ते", mr: "नमस्कार", gu: "નમસ્તે", ur: "ہیلو" },
+            Stop: { hi: "रुको", mr: "थांबा", gu: "રોકો", ur: "رک جاؤ" },
+            Yes: { hi: "हाँ", mr: "होय", gu: "હા", ur: "جی ہاں" },
+            No: { hi: "नहीं", mr: "नाही", gu: "ના", ur: "نہیں" },
+            Come: { hi: "आओ", mr: "या", gu: "આવો", ur: "آؤ" },
+            Good: { hi: "अच्छा", mr: "चांगले", gu: "સારું", ur: "اچھا" },
+            Friend: { hi: "दोस्त", mr: "मित्र", gu: "મિત્ર", ur: "دوست" },
+            Sorry: { hi: "माफ़ करें", mr: "माफ करा", gu: "માફ કરશો", ur: "معاف کیجیے" },
+            Love: { hi: "प्यार", mr: "प्रेम", gu: "પ્રેમ", ur: "محبت" },
+            Ok: { hi: "ठीक है", mr: "ठीक आहे", gu: "ઠીક છે", ur: "ٹھیک ہے" },
+            Help: { hi: "मदद", mr: "मदत", gu: "મદદ", ur: "مدد" },
+            Together: { hi: "साथ", mr: "एकत्र", gu: "સાથે", ur: "ساتھ" },
+            Bye: { hi: "अलविदा", mr: "बाय", gu: "આવજો", ur: "خدا حافظ" }
+        };
+
+        // ---------- SENTENCE ENGINE (v2) ----------
+        const TRIPLE_PHRASES = {
+            "friend+good+hello": "Hello, my good friend!",
+            "friend+help+together": "Let's help each other, my friend.",
+            "friend+love+together": "I love being together with you, my friend.",
+            "good+help+yes": "Yes, that help was really good.",
+            "bye+friend+hello": "Hello and goodbye, my friend!",
+            "friend+sorry+together": "I'm sorry, my friend -- let's stay together."
+        };
+        const PAIR_PHRASES = {
+            "friend+hello": "Hello, my friend!",
+            "friend+love": "I love my friend.",
+            "friend+help": "I need your help, my friend.",
+            "friend+sorry": "I'm sorry, my friend.",
+            "friend+good": "You are such a good friend.",
+            "come+together": "Let's come together.",
+            "help+together": "Let's help each other.",
+            "good+together": "It's good that we're together.",
+            "good+yes": "Yes, that's really good.",
+            "no+sorry": "No, and I'm sorry about that.",
+            "help+stop": "Stop! I need help!",
+            "bye+hello": "Hello, and goodbye!",
+            "love+ok": "It's okay -- I love you.",
+            "good+ok": "Okay, that sounds good.",
+            "no+stop": "No, please stop.",
+            "friend+together": "We're together, my friend.",
+            "friend+yes": "Yes, my friend.",
+            "come+help": "Come and help me.",
+            "love+together": "Let's stay together, my love.",
+            "bye+love": "I love you -- goodbye for now.",
+            "good+hello": "Hello! It's good to see you.",
+            "no+ok": "No, that's not okay.",
+            "friend+ok": "Okay, my friend.",
+            "friend+stop": "Stop it, my friend."
+        };
+        const REPEAT_TEXT = {
+            Yes: "Yes, yes -- absolutely!",
+            No: "No, no, not at all.",
+            Good: "Good, so good!",
+            Stop: "Stop, stop right now!",
+            Help: "Help! I really need help!",
+            Love: "I love you, I really do."
+        };
+        const WORD_TEMPLATE = {
+            Hello: "Hello!", Stop: "Stop.", Yes: "Yes.", No: "No.",
+            Come: "Please come here.", Good: "That's good.", Friend: "You are my friend.",
+            Sorry: "I'm sorry.", Love: "I love you.", Ok: "Okay.", Help: "I need help.",
+            Together: "Let's stay together.", Bye: "Goodbye!"
+        };
+
+        function sortedKey(arr) { return arr.map(w => w.toLowerCase()).sort().join('+'); }
+
+        function compressRepeats(words) {
+            const tokens = [];
+            let i = 0;
+            while (i < words.length) {
+                let j = i;
+                while (j + 1 < words.length && words[j + 1] === words[i]) j++;
+                tokens.push(j > i ? { type: 'repeat', word: words[i] } : { type: 'single', word: words[i] });
+                i = j + 1;
+            }
+            return tokens;
+        }
+
+        function repeatText(word) {
+            return REPEAT_TEXT[word] || `${word}, ${word.toLowerCase()}!`;
+        }
+
+        function stripPunct(s) {
+            const m = s.match(/([.!?]+)\s*$/);
+            return m ? { base: s.slice(0, -m[1].length), punct: m[1][0] } : { base: s, punct: '.' };
+        }
+
+        function fuseClauses(clauses) {
+            const sentences = [];
+            let run = [];
+            const flushRun = () => {
+                if (run.length === 0) return;
+                if (run.length === 1) {
+                    sentences.push(run[0].text);
+                } else {
+                    const parts = run.map(c => stripPunct(c.text));
+                    let punct = '.';
+                    if (parts.some(p => p.punct === '!')) punct = '!';
+                    else if (parts.some(p => p.punct === '?')) punct = '?';
+                    const bases = parts.map(p => p.base.trim());
+                    const fused = bases.map((b, idx) => idx === 0 ? b : b.charAt(0).toLowerCase() + b.slice(1));
+                    const joined = fused.length === 2
+                        ? fused[0] + ', and ' + fused[1]
+                        : fused.slice(0, -1).join(', ') + ', and ' + fused[fused.length - 1];
+                    sentences.push(joined + punct);
+                }
+                run = [];
+            };
+            clauses.forEach(c => {
+                if (c.simple) run.push(c);
+                else { flushRun(); sentences.push(c.text); }
+            });
+            flushRun();
+            let out = sentences.join(' ').trim();
+            return out.charAt(0).toUpperCase() + out.slice(1);
+        }
+
+        function toNaturalSentence(words) {
+            if (words.length === 0) return "";
+            const tokens = compressRepeats(words);
+            const clauses = [];
+            let i = 0;
+            while (i < tokens.length) {
+                const tok = tokens[i];
+                if (tok.type === 'repeat') {
+                    clauses.push({ text: repeatText(tok.word), simple: false });
+                    i++;
+                    continue;
+                }
+                if (i + 2 < tokens.length && tokens[i + 1].type === 'single' && tokens[i + 2].type === 'single') {
+                    const key = sortedKey([tok.word, tokens[i + 1].word, tokens[i + 2].word]);
+                    if (TRIPLE_PHRASES[key]) {
+                        clauses.push({ text: TRIPLE_PHRASES[key], simple: false });
+                        i += 3;
+                        continue;
+                    }
+                }
+                if (i + 1 < tokens.length && tokens[i + 1].type === 'single') {
+                    const key = sortedKey([tok.word, tokens[i + 1].word]);
+                    if (PAIR_PHRASES[key]) {
+                        clauses.push({ text: PAIR_PHRASES[key], simple: false });
+                        i += 2;
+                        continue;
+                    }
+                }
+                clauses.push({ text: WORD_TEMPLATE[tok.word] || (tok.word + "."), simple: true });
+                i++;
+            }
+            return fuseClauses(clauses);
+        }
+
+        // ---------- SIDEBAR / VIEW NAVIGATION ----------
+        function switchView(name) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            const el = document.getElementById('view-' + name);
+            if (el) el.classList.add('active');
+            document.querySelectorAll('.sb-item').forEach(it => it.classList.toggle('active', it.dataset.view === name));
+            if (name === 'dashboard') renderDashboardView();
+            if (name === 'history') renderHistoryView();
+        }
+        document.querySelectorAll('.sb-item').forEach(it => {
+            it.addEventListener('click', () => switchView(it.dataset.view));
+        });
+        document.getElementById('dash-start-cam').onclick = () => switchView('detect');
+        document.getElementById('dash-view-history').onclick = () => switchView('history');
+        document.getElementById('dash-view-model').onclick = () => switchView('model');
+
+        // ---------- BACKEND (TensorFlow) ENGINE INTEGRATION ----------
+        let BACKEND_URL = '';
+        let detectionEngine = 'browser';   // 'browser' | 'server' | 'custom'
+        let backendGestures = [];
+        let lastBackendCallAt = 0;
+        const BACKEND_THROTTLE_MS = 350;
+        let backendBusy = false;
+
+        // ---------- CUSTOM (ONLINE-IMPORTED) TFJS MODEL ----------
+        let customModel = null;
+        let customModelLabels = [];
+        let customModelBusy = false;
+        let lastCustomCallAt = 0;
+        const CUSTOM_THROTTLE_MS = 200;
+
+        function setCustomModelStatus(text, kind) {
+            const pill = document.getElementById('custom-model-status');
+            pill.className = 'status-pill' + (kind === 'ok' ? ' ok' : kind === 'err' ? ' err' : '');
+            pill.innerHTML = '<span class="d"></span>' + text;
+        }
+
+        async function loadCustomModelFromUrl(url, labelsRaw) {
+            if (!url) { setCustomModelStatus('Enter a model.json URL first', 'err'); return; }
+            const labels = labelsRaw.split(',').map(s => s.trim()).filter(Boolean);
+            if (labels.length === 0) { setCustomModelStatus('Add at least one output label', 'err'); return; }
+            setCustomModelStatus('Loading model…');
+            try {
+                // Works for both tf.loadLayersModel-style (Keras export) and graph models;
+                // try Layers first since most simple classifiers are exported that way.
+                let model;
+                try {
+                    model = await tf.loadLayersModel(url);
+                } catch (innerErr) {
+                    model = await tf.loadGraphModel(url);
+                }
+                customModel = model;
+                customModelLabels = labels;
+                setCustomModelStatus(`Loaded — ${labels.length} labels ready`, 'ok');
+            } catch (err) {
+                customModel = null;
+                setCustomModelStatus('Failed to load: ' + (err.message || 'check URL / CORS'), 'err');
+            }
+        }
+        document.getElementById('load-custom-model-btn').onclick = () => {
+            const url = document.getElementById('custom-model-url').value.trim();
+            const labels = document.getElementById('custom-model-labels').value.trim();
+            loadCustomModelFromUrl(url, labels);
+        };
+
+        async function customModelPredict(handLandmarks) {
+            if (!customModel || customModelBusy) return null;
+            const now = performance.now();
+            if (now - lastCustomCallAt < CUSTOM_THROTTLE_MS) return null;
+            lastCustomCallAt = now;
+            customModelBusy = true;
+            try {
+                const flat = [];
+                handLandmarks.forEach(p => { flat.push(p.x, p.y, p.z || 0); });
+                const input = tf.tensor2d([flat]);
+                const out = customModel.predict(input);
+                const data = await out.data();
+                input.dispose();
+                if (Array.isArray(out)) { out.forEach(t => t.dispose()); } else { out.dispose(); }
+                let bestIdx = 0, bestVal = -Infinity;
+                data.forEach((v, i) => { if (v > bestVal) { bestVal = v; bestIdx = i; } });
+                const label = customModelLabels[bestIdx] || ('class_' + bestIdx);
+                return { key: label, conf: Math.max(0, Math.min(1, bestVal)) };
+            } catch (err) {
+                return null;
+            } finally {
+                customModelBusy = false;
+            }
+        }
+
+        // ---------- FIREBASE REALTIME DATABASE ----------
+        const firebaseConfig = {
+            apiKey: "AIzaSyDhcU_-igme4yghWnM-j9Ki0Hjvt9BrFNE",
+            authDomain: "hand-gesture-2026.firebaseapp.com",
+            databaseURL: "https://hand-gesture-2026-default-rtdb.firebaseio.com",
+            projectId: "hand-gesture-2026",
+            storageBucket: "hand-gesture-2026.firebasestorage.app",
+            messagingSenderId: "879957266853",
+            appId: "1:879957266853:web:c6059bdf482ec30448984c",
+            measurementId: "G-YWNX91E3PM"
+        };
+        let firebaseDb = null;
+        let firebaseReady = false;
+        let firebaseSessionId = null;
+
+        function getFirebaseSessionId() {
+            const key = 'signspeakFirebaseSessionId';
+            let id = localStorage.getItem(key);
+            if (!id) {
+                id = 'session_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+                localStorage.setItem(key, id);
+            }
+            return id;
+        }
+
+        function initFirebase() {
+            try {
+                if (!window.firebase || !firebase.database) return;
+                if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+                firebaseDb = firebase.database();
+                firebaseSessionId = getFirebaseSessionId();
+                firebaseReady = true;
+                document.getElementById('dash-firebase-text').textContent = 'Connected · session ' + firebaseSessionId.slice(0, 14) + '…';
+            } catch (err) {
+                firebaseReady = false;
+                document.getElementById('dash-firebase-text').textContent = 'Not connected';
+                console.warn('Firebase init failed:', err);
+            }
+        }
+
+        function firebasePath(collection) {
+            return `signspeak/sessions/${firebaseSessionId}/${collection}`;
+        }
+
+        function firebasePayloadTime(date) {
+            return date instanceof Date ? date.toISOString() : new Date().toISOString();
+        }
+
+        function escapeHtml(value) {
+            return String(value).replace(/[&<>"']/g, ch => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            }[ch]));
+        }
+
+        function saveDetectionToFirebase(entry) {
+            if (!firebaseReady || !firebaseDb) return;
+            const payload = {
+                word: entry.word,
+                confidence: Number(entry.confidence || 0),
+                mode: appMode,
+                time: firebasePayloadTime(entry.time),
+                createdAt: firebase.database.ServerValue.TIMESTAMP
+            };
+            firebaseDb.ref(firebasePath('detections')).push(payload).catch(err => {
+                console.warn('Firebase detection save failed:', err);
+            });
+        }
+
+        function saveConversationToFirebase(entry, source) {
+            if (!firebaseReady || !firebaseDb) return;
+            const payload = {
+                text: entry.text,
+                gloss: entry.gloss || [],
+                source: source || appMode,
+                time: firebasePayloadTime(entry.time),
+                createdAt: firebase.database.ServerValue.TIMESTAMP
+            };
+            firebaseDb.ref(firebasePath('conversations')).push(payload).catch(err => {
+                console.warn('Firebase conversation save failed:', err);
+            });
+        }
+
+        function loadFirebaseHistory() {
+            if (!firebaseReady || !firebaseDb) return;
+            firebaseDb.ref(firebasePath('detections')).orderByChild('createdAt').limitToLast(50).once('value')
+                .then(snapshot => {
+                    const loaded = [];
+                    snapshot.forEach(child => {
+                        const item = child.val() || {};
+                        if (!item.word) return;
+                        loaded.push({
+                            word: String(item.word),
+                            confidence: Number(item.confidence || 0),
+                            time: item.time ? new Date(item.time) : new Date(item.createdAt || Date.now())
+                        });
+                    });
+                    if (loaded.length) {
+                        history = loaded.reverse();
+                        renderHistory();
+                        renderDashboard();
+                    }
+                })
+                .catch(err => console.warn('Firebase history load failed:', err));
+        }
+
+        function loadFirebaseConversations() {
+            if (!firebaseReady || !firebaseDb) return;
+            firebaseDb.ref(firebasePath('conversations')).orderByChild('createdAt').limitToLast(20).once('value')
+                .then(snapshot => {
+                    const loaded = [];
+                    snapshot.forEach(child => {
+                        const item = child.val() || {};
+                        if (!item.text) return;
+                        loaded.push({
+                            text: String(item.text),
+                            gloss: Array.isArray(item.gloss) ? item.gloss.map(String) : [],
+                            time: item.time ? new Date(item.time) : new Date(item.createdAt || Date.now())
+                        });
+                    });
+                    if (loaded.length) {
+                        conversationLog = loaded.reverse();
+                        renderConversationLog();
+                    }
+                })
+                .catch(err => console.warn('Firebase conversations load failed:', err));
+        }
+
+        function clearFirebaseHistory() {
+            if (!firebaseReady || !firebaseDb) return;
+            firebaseDb.ref(firebasePath('detections')).remove().catch(err => {
+                console.warn('Firebase history clear failed:', err);
+            });
+        }
+
+        async function fetchSavedFirebaseHistory() {
+            if (!firebaseReady || !firebaseDb) {
+                return { detections: [], conversations: [], error: 'Firebase is not connected yet.' };
+            }
+            try {
+                const [detectionsSnap, conversationsSnap] = await Promise.all([
+                    firebaseDb.ref(firebasePath('detections')).orderByChild('createdAt').limitToLast(100).once('value'),
+                    firebaseDb.ref(firebasePath('conversations')).orderByChild('createdAt').limitToLast(50).once('value')
+                ]);
+                const detections = [];
+                detectionsSnap.forEach(child => {
+                    const item = child.val() || {};
+                    if (!item.word) return;
+                    detections.push({
+                        word: String(item.word),
+                        confidence: Number(item.confidence || 0),
+                        mode: String(item.mode || ''),
+                        time: item.time ? new Date(item.time) : new Date(item.createdAt || Date.now())
+                    });
+                });
+                const conversations = [];
+                conversationsSnap.forEach(child => {
+                    const item = child.val() || {};
+                    if (!item.text) return;
+                    conversations.push({
+                        text: String(item.text),
+                        source: String(item.source || ''),
+                        gloss: Array.isArray(item.gloss) ? item.gloss.map(String) : [],
+                        time: item.time ? new Date(item.time) : new Date(item.createdAt || Date.now())
+                    });
+                });
+                return {
+                    detections: detections.reverse(),
+                    conversations: conversations.reverse(),
+                    error: ''
+                };
+            } catch (err) {
+                return { detections: [], conversations: [], error: err.message || 'Could not load Firebase history.' };
+            }
+        }
+
+        async function checkBackendHealth() {
+            const statusEl = document.getElementById('engine-status');
+            const statusEl2 = document.getElementById('engine-status-2');
+            const setText = (t, c) => { statusEl.textContent = t; statusEl.style.color = c; if (statusEl2) { statusEl2.textContent = t; statusEl2.style.color = c; } };
+            try {
+                const res = await fetch(`${BACKEND_URL}/api/health`);
+                const data = await res.json();
+                if (data.model_loaded) {
+                    backendGestures = data.gestures || [];
+                    setText(`Server model ready — knows: ${backendGestures.join(', ')}`, '#128AF4');
+                } else {
+                    setText('Server reachable but no trained model yet (run collect_data.py + train_model.py).', 'var(--coral)');
+                }
+            } catch (err) {
+                setText('Backend not reachable — start it with "python app.py". Using browser engine.', 'var(--muted)');
+            }
+        }
+        document.getElementById('check-backend-btn').onclick = () => {
+            BACKEND_URL = document.getElementById('backend-url-input').value.trim();
+            checkBackendHealth();
+        };
+
+        async function backendPredict(handLandmarks) {
+            if (backendBusy) return null;
+            const now = performance.now();
+            if (now - lastBackendCallAt < BACKEND_THROTTLE_MS) return null;
+            lastBackendCallAt = now;
+            backendBusy = true;
+            try {
+                const landmarks = handLandmarks.map(p => [p.x, p.y, p.z]);
+                const res = await fetch(`${BACKEND_URL}/api/predict`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ landmarks })
+                });
+                const data = await res.json();
+                if (data.error || !data.label || data.matched === false) return null;
+                return { key: data.label, conf: data.confidence };
+            } catch (err) {
+                return null;
+            } finally {
+                backendBusy = false;
+            }
+        }
+
+        function setEngine(name) {
+            detectionEngine = name;
+            document.getElementById('engine-select').value = name;
+            document.querySelectorAll('.engine-opt').forEach(o => o.classList.toggle('active', o.dataset.engine === name));
+            document.getElementById('dash-engine-pill').innerHTML =
+                name === 'browser' ? '<span class="status-pill ok"><span class="d"></span>Browser rules engine</span>'
+                    : name === 'server' ? '<span class="status-pill"><span class="d"></span>Server AI (TensorFlow)</span>'
+                        : '<span class="status-pill"><span class="d"></span>Custom model (URL)</span>';
+            candidateBuffer = [];
+            alphaBuffer = [];
+            if (name === 'server') checkBackendHealth();
+        }
+        document.getElementById('engine-select').addEventListener('change', (e) => setEngine(e.target.value));
+        document.querySelectorAll('.engine-opt').forEach(opt => {
+            opt.addEventListener('click', () => setEngine(opt.dataset.engine));
+        });
+        checkBackendHealth();
+
+        let sentence = [];
+        let history = [];
+        let camera = null;
+        let hands = null;
+        let currentFacing = "user";
+        let speakOnDetect = true;
+        let lastSpokenWord = null;
+        let lastSpokenTime = 0;
+        let fpsLast = performance.now();
+        let fpsFrames = 0;
+        let candidateBuffer = [];
+        const HOLD_MS = 380;
+        const MIN_AGREEMENT = 0.6;
+        let waveBuffer = [];
+        const WAVE_WINDOW_MS = 900;
+        const SENTENCE_PAUSE_MS = 2500;
+        let lastWordTime = 0;
+        let sentenceTimer = null;
+        let conversationLog = [];
+
+        // ---------- ALPHABET MODE STATE ----------
+        let appMode = 'words';
+        let spellText = '';
+        let alphaBuffer = [];
+        const ALPHA_HOLD_MS = 420;
+        let lastSpokenLetter = null;
+        let lastSpokenLetterTime = 0;
+        let lastLetterTime = 0;
+        const WORD_GAP_MS = 1300;
+        let letterLineTimer = null;
+        let jMotionBuffer = [];
+        let zMotionBuffer = [];
+
+        const videoEl = document.getElementById('video');
+        const overlay = document.getElementById('overlay');
+        const octx = overlay.getContext('2d');
+        const stageEmpty = document.getElementById('stage-empty');
+        const hud = document.getElementById('hud');
+        const liveDot = document.getElementById('live-dot');
+        const confBar = document.getElementById('conf-bar');
+        const confVal = document.getElementById('conf-val');
+        const gestureBadge = document.getElementById('gesture-badge');
+        const handsBadge = document.getElementById('hands-badge');
+        const fpsCounter = document.getElementById('fps-counter');
+
+        // ---------- THEME ----------
+        document.getElementById('theme-dark').onclick = () => setTheme('dark');
+        document.getElementById('theme-light').onclick = () => setTheme('light');
+        function setTheme(t) {
+            document.body.classList.toggle('light', t === 'light');
+            document.getElementById('theme-dark').classList.toggle('active', t === 'dark');
+            document.getElementById('theme-light').classList.toggle('active', t === 'light');
+        }
+
+        // ---------- SPEECH ----------
+        let voices = [];
+        function loadVoices() {
+            voices = window.speechSynthesis.getVoices();
+            const sel = document.getElementById('voice-select');
+            sel.innerHTML = '';
+            if (voices.length === 0) {
+                const opt = document.createElement('option');
+                opt.textContent = 'Default voice';
+                sel.appendChild(opt);
+                return;
+            }
+            voices.forEach((v, i) => {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = `${v.name} (${v.lang})`;
+                sel.appendChild(opt);
+            });
+        }
+        if ('speechSynthesis' in window) {
+            loadVoices();
+            window.speechSynthesis.onvoiceschanged = loadVoices;
+        }
+        function speak(text) {
+            if (!speakOnDetect || !('speechSynthesis' in window)) return;
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(text);
+            const sel = document.getElementById('voice-select');
+            if (voices[sel.value]) u.voice = voices[sel.value];
+            u.rate = parseFloat(document.getElementById('rate-range').value);
+            u.volume = parseFloat(document.getElementById('vol-range').value);
+            window.speechSynthesis.speak(u);
+        }
+        document.getElementById('mute-btn').onclick = function () {
+            speakOnDetect = !speakOnDetect;
+            this.textContent = speakOnDetect ? '🔊 Speak on detect' : '🔇 Muted';
+            this.classList.toggle('active', !speakOnDetect);
+        };
+
+        // ---------- TRANSLATION ----------
+        document.getElementById('lang-select').onchange = renderSentence;
+
+        // ---------- SENTENCE BUILDER ----------
+        function renderSentence() {
+            const box = document.getElementById('sentence-box');
+            const lang = document.getElementById('lang-select').value;
+            document.getElementById('word-count').textContent = sentence.length + (sentence.length === 1 ? ' word' : ' words');
+            const nLine = document.getElementById('natural-line');
+            if (sentence.length === 0) {
+                box.innerHTML = '<span class="placeholder">Detected signs will appear here as words…</span>';
+                document.getElementById('translation-line').textContent = '';
+                nLine.innerHTML = '';
+                return;
+            }
+            box.innerHTML = sentence.map(w => `<span class="word-chip">${w}</span>`).join(' ');
+            nLine.innerHTML = '<b>Sentence</b>' + toNaturalSentence(sentence);
+            const tLine = document.getElementById('translation-line');
+            if (lang === 'en') { tLine.textContent = ''; }
+            else {
+                const translated = sentence.map(w => (TRANSLATIONS[w] && TRANSLATIONS[w][lang]) || w).join(' ');
+                tLine.textContent = translated;
+            }
+            document.getElementById('dash-mode-text').textContent = appMode === 'words' ? 'Word signs' : 'Alphabet';
+        }
+        function addWord(word) {
+            sentence.push(word);
+            renderSentence();
+        }
+        document.getElementById('undo-btn').onclick = () => { sentence.pop(); renderSentence(); };
+        document.getElementById('delete-last-btn').onclick = () => { sentence.pop(); renderSentence(); };
+        document.getElementById('clear-btn').onclick = () => {
+            sentence = [];
+            if (sentenceTimer) clearTimeout(sentenceTimer);
+            renderSentence();
+        };
+        document.getElementById('copy-btn').onclick = () => {
+            navigator.clipboard.writeText(sentence.join(' ')).catch(() => { });
+            const btn = document.getElementById('copy-btn');
+            const old = btn.textContent; btn.textContent = 'Copied ✓';
+            setTimeout(() => btn.textContent = old, 1200);
+        };
+
+        // ---------- ALPHABET (FINGERSPELLING) BUILDER ----------
+        function renderAlphabet() {
+            const box = document.getElementById('alphabet-box');
+            const letters = spellText.replace(/ /g, '').length;
+            document.getElementById('letter-count').textContent = letters + (letters === 1 ? ' letter' : ' letters');
+            if (!spellText) {
+                box.innerHTML = '<span class="placeholder">Fingerspelled letters will appear here — hold each letter steady for a moment…</span>';
+                return;
+            }
+            box.innerHTML = spellText.split('').map(ch => ch === ' '
+                ? '&nbsp;&nbsp;'
+                : `<span class="word-chip">${ch}</span>`).join('');
+        }
+        function addLetter(letter) {
+            const nowT = Date.now();
+            if (spellText.length && !spellText.endsWith(' ') && (nowT - lastLetterTime) > WORD_GAP_MS) {
+                spellText += ' ';
+            }
+            spellText += letter;
+            lastLetterTime = nowT;
+            renderAlphabet();
+        }
+        function armLetterLineTimer() {
+            lastLetterTime = Date.now();
+            if (letterLineTimer) clearTimeout(letterLineTimer);
+            letterLineTimer = setTimeout(() => {
+                if (Date.now() - lastLetterTime >= SENTENCE_PAUSE_MS - 50) finalizeSpelling();
+            }, SENTENCE_PAUSE_MS);
+        }
+        function finalizeSpelling() {
+            const text = spellText.trim();
+            if (!text) return;
+            const entry = { gloss: text.split(' '), text: text, time: new Date() };
+            conversationLog.unshift(entry);
+            saveConversationToFirebase(entry, 'alphabet');
+            spellText = '';
+            renderAlphabet();
+            renderConversationLog();
+            if (speakOnDetect && 'speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const u = new SpeechSynthesisUtterance(text);
+                const sel = document.getElementById('voice-select');
+                if (voices[sel.value]) u.voice = voices[sel.value];
+                u.rate = parseFloat(document.getElementById('rate-range').value);
+                u.volume = parseFloat(document.getElementById('vol-range').value);
+                window.speechSynthesis.speak(u);
+            }
+        }
+        document.getElementById('space-btn').onclick = () => {
+            if (spellText.length && !spellText.endsWith(' ')) spellText += ' ';
+            renderAlphabet();
+        };
+        document.getElementById('backspace-btn').onclick = () => {
+            spellText = spellText.slice(0, -1);
+            renderAlphabet();
+        };
+        document.getElementById('clear-alpha-btn').onclick = () => {
+            spellText = '';
+            if (letterLineTimer) clearTimeout(letterLineTimer);
+            renderAlphabet();
+        };
+        document.getElementById('copy-alpha-btn').onclick = () => {
+            navigator.clipboard.writeText(spellText.trim()).catch(() => { });
+            const btn = document.getElementById('copy-alpha-btn');
+            const old = btn.textContent; btn.textContent = 'Copied ✓';
+            setTimeout(() => btn.textContent = old, 1200);
+        };
+
+        // ---------- MODE SWITCHING (word / alphabet) ----------
+        function setAppMode(m) {
+            appMode = m;
+            document.getElementById('mode-word-btn').classList.toggle('active', m === 'words');
+            document.getElementById('mode-alpha-btn').classList.toggle('active', m === 'alphabet');
+            document.getElementById('words-panel').style.display = m === 'words' ? '' : 'none';
+            document.getElementById('alphabet-panel').style.display = m === 'alphabet' ? '' : 'none';
+            candidateBuffer = [];
+            alphaBuffer = [];
+            gestureBadge.textContent = '—';
+            confBar.style.width = '0%';
+            confVal.textContent = '0%';
+            document.getElementById('dash-mode-text').textContent = m === 'words' ? 'Word signs' : 'Alphabet';
+        }
+        document.getElementById('mode-word-btn').onclick = () => setAppMode('words');
+        document.getElementById('mode-alpha-btn').onclick = () => setAppMode('alphabet');
+
+        // ---------- HISTORY / DASHBOARD ----------
+        function logDetection(word, confidence) {
+            const entry = { word, confidence, time: new Date() };
+            history.unshift(entry);
+            renderHistory();
+            renderDashboard();
+            saveDetectionToFirebase(entry);
+        }
+        function renderHistory() {
+            const wrap = document.getElementById('history-wrap-full');
+            document.getElementById('sb-history-count').textContent = history.length;
+            if (history.length === 0) {
+                if (wrap) wrap.innerHTML = '<div class="hist-empty">No gestures detected yet — history will populate as you sign.</div>';
+                if (document.getElementById('hist-count-text')) document.getElementById('hist-count-text').textContent = '0 entries';
+                return;
+            }
+            renderHistoryTable(document.getElementById('hist-search') ? document.getElementById('hist-search').value : '');
+        }
+        function renderHistoryTable(filter) {
+            const wrap = document.getElementById('history-wrap-full');
+            if (!wrap) return;
+            const f = (filter || '').trim().toLowerCase();
+            const rows = history.filter(e => !f || e.word.toLowerCase().includes(f));
+            document.getElementById('hist-count-text').textContent = rows.length + (rows.length === 1 ? ' entry' : ' entries');
+            if (rows.length === 0) {
+                wrap.innerHTML = '<div class="hist-empty">No matching entries.</div>';
+                return;
+            }
+            const body = rows.slice(0, 300).map(e => `
+    <tr>
+      <td>${escapeHtml(e.word)}</td>
+      <td class="conf">${Math.round(e.confidence * 100)}%</td>
+      <td>${e.time.toLocaleTimeString()}</td>
+      <td>${e.time.toLocaleDateString()}</td>
+    </tr>`).join('');
+            wrap.innerHTML = `<table><thead><tr><th>Sign</th><th>Confidence</th><th>Time</th><th>Date</th></tr></thead><tbody>${body}</tbody></table>`;
+        }
+        document.addEventListener('input', (e) => {
+            if (e.target && e.target.id === 'hist-search') renderHistoryTable(e.target.value);
+        });
+        function renderDashboard() {
+            const total = history.length;
+            const today = new Date().toDateString();
+            const todayCount = history.filter(e => e.time.toDateString() === today).length;
+            const avg = history.length ? history.reduce((s, e) => s + e.confidence, 0) / history.length : 0;
+            const avgPct = Math.round(avg * 100) + '%';
+            let most = '—';
+            const counts = {};
+            if (history.length) {
+                history.forEach(e => counts[e.word] = (counts[e.word] || 0) + 1);
+                most = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+            }
+            ['d-stat-total'].forEach(id => document.getElementById(id).textContent = total);
+            document.getElementById('d-stat-today').textContent = todayCount;
+            document.getElementById('d-stat-avgconf').textContent = avgPct;
+            document.getElementById('d-stat-sentences').textContent = conversationLog.length;
+            document.getElementById('d-stat-hands').textContent = (handsBadge && handsBadge.textContent) ? handsBadge.textContent.replace(/\s*hands?/, '') : '0';
+            document.getElementById('d-stat-fps').textContent = (fpsCounter && fpsCounter.textContent) ? fpsCounter.textContent.replace(/\s*FPS/, '') : '0';
+
+            // top signs bar chart
+            const topWrap = document.getElementById('dash-top-signs');
+            const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+            if (entries.length === 0) {
+                topWrap.innerHTML = '<div class="hist-empty">No detections yet.</div>';
+            } else {
+                const max = entries[0][1];
+                topWrap.innerHTML = entries.map(([w, c]) => `
+      <div class="bar-row">
+        <div class="bl">${escapeHtml(w)}</div>
+        <div class="bt"><i style="width:${Math.round(c / max * 100)}%"></i></div>
+        <div class="bv">${c}</div>
+      </div>`).join('');
+            }
+
+            // recent activity
+            const recentWrap = document.getElementById('dash-recent');
+            if (history.length === 0) {
+                recentWrap.innerHTML = '<div class="hist-empty">Nothing detected yet — start signing in Live Detect.</div>';
+            } else {
+                recentWrap.innerHTML = history.slice(0, 6).map(e => `
+      <div class="convo-line" style="padding:8px 10px;">
+        <div class="convo-text">${escapeHtml(e.word)} <span style="color:var(--teal);font-family:'JetBrains Mono',monospace;font-size:10.5px;">${Math.round(e.confidence * 100)}%</span></div>
+        <div class="convo-meta">${e.time.toLocaleTimeString()}</div>
+      </div>`).join('');
+            }
+
+            const convoWrap = document.getElementById('dash-recent-convo');
+            if (conversationLog.length === 0) {
+                convoWrap.innerHTML = '<div class="hist-empty">Finished sentences will appear here.</div>';
+            } else {
+                convoWrap.innerHTML = conversationLog.slice(0, 5).map(c => `
+      <div class="convo-line" style="padding:8px 10px;">
+        <div class="convo-text">${escapeHtml(c.text)}</div>
+        <div class="convo-meta">${c.time.toLocaleTimeString()}</div>
+      </div>`).join('');
+            }
+        }
+        function renderDashboardView() { renderDashboard(); }
+        function renderHistoryView() { renderHistory(); renderConversationLog(); }
+
+        document.getElementById('export-csv').onclick = () => {
+            if (history.length === 0) return;
+            const rows = [['Sign', 'Confidence', 'Timestamp'], ...history.map(e => [e.word, (e.confidence * 100).toFixed(0) + '%', e.time.toISOString()])];
+            const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'mrvoxa-history.csv'; a.click();
+            URL.revokeObjectURL(url);
+        };
+        document.getElementById('clear-history').onclick = () => {
+            history = [];
+            renderHistory();
+            renderDashboard();
+            clearFirebaseHistory();
+        };
+
+        // ---------- HISTORY VIEW TABS ----------
+        function setHistTab(tab) {
+            document.querySelectorAll('#hist-tab-detections, #hist-tab-conversations, #hist-tab-saved').forEach(b => b.classList.remove('active'));
+            document.getElementById('hist-panel-detections').style.display = 'none';
+            document.getElementById('hist-panel-conversations').style.display = 'none';
+            document.getElementById('hist-panel-saved').style.display = 'none';
+            if (tab === 'detections') { document.getElementById('hist-tab-detections').classList.add('active'); document.getElementById('hist-panel-detections').style.display = ''; }
+            if (tab === 'conversations') { document.getElementById('hist-tab-conversations').classList.add('active'); document.getElementById('hist-panel-conversations').style.display = ''; renderConversationLog(); }
+            if (tab === 'saved') { document.getElementById('hist-tab-saved').classList.add('active'); document.getElementById('hist-panel-saved').style.display = ''; showSavedHistoryInline(); }
+        }
+        document.getElementById('hist-tab-detections').onclick = () => setHistTab('detections');
+        document.getElementById('hist-tab-conversations').onclick = () => setHistTab('conversations');
+        document.getElementById('hist-tab-saved').onclick = () => setHistTab('saved');
+        document.getElementById('refresh-saved-history-2').onclick = () => showSavedHistoryInline();
+
+        async function showSavedHistoryInline() {
+            const content = document.getElementById('saved-history-content-2');
+            content.innerHTML = '<div class="hist-empty">Loading saved Firebase data...</div>';
+            const data = await fetchSavedFirebaseHistory();
+            if (data.error) {
+                content.innerHTML = `<div class="hist-empty">${escapeHtml(data.error)}</div>`;
+                return;
+            }
+            const detectionRows = data.detections.length
+                ? data.detections.map(e => `
+      <div class="saved-row">
+        <b>${escapeHtml(e.word)}</b> (${Math.round(e.confidence * 100)}%)
+        <span>${escapeHtml(e.mode || 'gesture')} - ${e.time.toLocaleString()}</span>
+      </div>`).join('')
+                : '<div class="hist-empty">No saved detections found.</div>';
+            const conversationRows = data.conversations.length
+                ? data.conversations.map(c => `
+      <div class="saved-row">
+        <b>${escapeHtml(c.text)}</b>
+        <span>${escapeHtml(c.source || 'conversation')} - ${c.time.toLocaleString()}</span>
+      </div>`).join('')
+                : '<div class="hist-empty">No saved conversations found.</div>';
+            content.innerHTML = `
+    <div class="history-section-title">Detections</div>
+    ${detectionRows}
+    <div class="history-section-title">Conversations</div>
+    ${conversationRows}
+  `;
+        }
+
+        // legacy modal (kept, reachable only if referenced) — mirrors inline version
+        document.getElementById('refresh-saved-history').onclick = async () => {
+            const content = document.getElementById('saved-history-content');
+            content.innerHTML = '<div class="hist-empty">Loading saved Firebase data...</div>';
+            const data = await fetchSavedFirebaseHistory();
+            if (data.error) { content.innerHTML = `<div class="hist-empty">${escapeHtml(data.error)}</div>`; return; }
+            content.innerHTML = data.detections.map(e => `<div class="saved-row"><b>${escapeHtml(e.word)}</b><span>${e.time.toLocaleString()}</span></div>`).join('') || '<div class="hist-empty">No data.</div>';
+        };
+        document.getElementById('close-saved-history').onclick = () => {
+            document.getElementById('saved-history-modal').classList.remove('open');
+        };
+
+        // ---------- GESTURE CLASSIFIER (rule-based, geometric) ----------
+        function fingerExtended(lm, tip, pip, mcp) {
+            const wrist = lm[0];
+            const dTip = dist(lm[tip], wrist);
+            const dPip = dist(lm[pip], wrist);
+            return dTip > dPip * 1.15;
+        }
+        function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y, (a.z || 0) - (b.z || 0)); }
+
+        function classifyGesture(lm, handedness) {
+            const thumbUp = lm[4].y < lm[3].y - 0.02 && Math.abs(lm[4].x - lm[2].x) < 0.12;
+            const thumbDown = lm[4].y > lm[3].y + 0.02;
+            const index = fingerExtended(lm, 8, 6, 5);
+            const middle = fingerExtended(lm, 12, 10, 9);
+            const ring = fingerExtended(lm, 16, 14, 13);
+            const pinky = fingerExtended(lm, 20, 18, 17);
+            const extendedCount = [index, middle, ring, pinky].filter(Boolean).length;
+
+            if (extendedCount === 4) {
+                const spread = dist(lm[8], lm[20]);
+                return spread > 0.18 ? { key: 'hello', conf: 0.7 + Math.min(spread, 0.3) } : { key: 'stop', conf: 0.65 };
+            }
+            if (extendedCount === 0 && !thumbUp) {
+                return { key: 'no', conf: 0.72 };
+            }
+            if (extendedCount === 0 && thumbUp) {
+                return { key: 'yes', conf: 0.78 };
+            }
+            if (index && middle && !ring && !pinky) {
+                return { key: 'come', conf: 0.75 };
+            }
+            if (index && !middle && !ring && !pinky) {
+                return { key: 'good', conf: 0.68 };
+            }
+            if (!index && !middle && !ring && pinky && thumbUp) {
+                return { key: 'friend', conf: 0.66 };
+            }
+            if (index && middle && ring && !pinky) {
+                return { key: 'sorry', conf: 0.62 };
+            }
+            const thumbSplayed = dist(lm[4], lm[13]) > 0.15;
+            if (index && pinky && !middle && !ring && thumbSplayed) {
+                return { key: 'love', conf: 0.74 };
+            }
+            const pinch = dist(lm[4], lm[8]);
+            if (!index && middle && ring && pinky && pinch < 0.07) {
+                return { key: 'ok', conf: 0.7 };
+            }
+            return null;
+        }
+
+        function classifyTwoHand(lmA, lmB) {
+            const wristDist = dist(lmA[0], lmB[0]);
+            const shapeOf = (lm) => {
+                const idx = fingerExtended(lm, 8, 6, 5), mid = fingerExtended(lm, 12, 10, 9);
+                const rng = fingerExtended(lm, 16, 14, 13), pnk = fingerExtended(lm, 20, 18, 17);
+                return [idx, mid, rng, pnk].filter(Boolean).length;
+            };
+            const countA = shapeOf(lmA), countB = shapeOf(lmB);
+            if (countA === 0 && countB === 0 && wristDist < 0.28) {
+                return { key: 'together', conf: 0.68 };
+            }
+            const oneFlat = (countA === 4 && countB === 0) || (countA === 0 && countB === 4);
+            if (oneFlat && wristDist < 0.3) {
+                return { key: 'help', conf: 0.65 };
+            }
+            return null;
+        }
+
+        function extRatio(lm, tip, pip) {
+            return dist(lm[tip], lm[0]) / dist(lm[pip], lm[0]);
+        }
+        function classifyAlphabet(lm) {
+            const index = fingerExtended(lm, 8, 6, 5);
+            const middle = fingerExtended(lm, 12, 10, 9);
+            const ring = fingerExtended(lm, 16, 14, 13);
+            const pinky = fingerExtended(lm, 20, 18, 17);
+            const extendedCount = [index, middle, ring, pinky].filter(Boolean).length;
+
+            const thumbTipToIndexTip = dist(lm[4], lm[8]);
+            const thumbTipToMiddleTip = dist(lm[4], lm[12]);
+            const thumbTipToMiddleMCP = dist(lm[4], lm[9]);
+            const thumbTipToPinkyMCP = dist(lm[4], lm[17]);
+            const thumbAcrossPalm = thumbTipToMiddleMCP < 0.075;
+            const thumbOutSide = thumbTipToPinkyMCP > 0.15;
+            const curlSpan = dist(lm[8], lm[0]);
+
+            if (thumbTipToIndexTip < 0.055 && middle && ring && pinky) {
+                return { key: 'F', conf: 0.72 };
+            }
+            if (index && !middle && !ring && !pinky && thumbTipToMiddleTip < 0.08 && !thumbOutSide) {
+                return { key: 'D', conf: 0.7 };
+            }
+            if (index && !middle && !ring && !pinky && thumbOutSide) {
+                return { key: 'L', conf: 0.72 };
+            }
+            const indexRatio = extRatio(lm, 8, 6);
+            if (!middle && !ring && !pinky && indexRatio > 0.95 && indexRatio <= 1.15 && !thumbOutSide) {
+                return { key: 'X', conf: 0.58 };
+            }
+            if (pinky && !index && !middle && !ring && thumbOutSide) {
+                return { key: 'Y', conf: 0.72 };
+            }
+            if (pinky && !index && !middle && !ring && !thumbOutSide) {
+                return { key: 'I', conf: 0.68 };
+            }
+            if (index && middle && ring && !pinky) {
+                const spread = dist(lm[8], lm[16]);
+                return spread > 0.13 ? { key: 'W', conf: 0.66 } : { key: 'B', conf: 0.6 };
+            }
+            if (index && middle && !ring && !pinky) {
+                const spread = dist(lm[8], lm[12]);
+                return spread > 0.085 ? { key: 'V', conf: 0.72 } : { key: 'U', conf: 0.68 };
+            }
+            if (extendedCount === 4 && thumbAcrossPalm) {
+                return { key: 'B', conf: 0.68 };
+            }
+            if (extendedCount === 0) {
+                if (curlSpan > 0.23 && thumbTipToIndexTip < 0.10) {
+                    return { key: 'O', conf: 0.6 };
+                }
+                if (curlSpan > 0.23) {
+                    return { key: 'C', conf: 0.58 };
+                }
+                if (thumbAcrossPalm) {
+                    return { key: 'S', conf: 0.65 };
+                }
+                if (thumbOutSide || !thumbAcrossPalm) {
+                    return { key: 'A', conf: 0.68 };
+                }
+            }
+            return null;
+        }
+
+        function trackJ(handsLm) {
+            if (!handsLm || handsLm.length === 0) { jMotionBuffer = []; return null; }
+            const lm = handsLm[0];
+            const index = fingerExtended(lm, 8, 6, 5);
+            const middle = fingerExtended(lm, 12, 10, 9);
+            const ring = fingerExtended(lm, 16, 14, 13);
+            const pinky = fingerExtended(lm, 20, 18, 17);
+            const nowMs = performance.now();
+            if (!(pinky && !index && !middle && !ring)) { jMotionBuffer = []; return null; }
+            jMotionBuffer.push({ x: lm[20].x, y: lm[20].y, t: nowMs });
+            jMotionBuffer = jMotionBuffer.filter(p => nowMs - p.t <= 700);
+            if (jMotionBuffer.length < 5) return null;
+            const dx = Math.max(...jMotionBuffer.map(p => p.x)) - Math.min(...jMotionBuffer.map(p => p.x));
+            const dy = Math.max(...jMotionBuffer.map(p => p.y)) - Math.min(...jMotionBuffer.map(p => p.y));
+            if (dx > 0.05 && dy > 0.05) return { key: 'J', conf: 0.55 };
+            return null;
+        }
+
+        function trackZ(handsLm) {
+            if (!handsLm || handsLm.length === 0) { zMotionBuffer = []; return null; }
+            const lm = handsLm[0];
+            const index = fingerExtended(lm, 8, 6, 5);
+            const middle = fingerExtended(lm, 12, 10, 9);
+            const ring = fingerExtended(lm, 16, 14, 13);
+            const pinky = fingerExtended(lm, 20, 18, 17);
+            const nowMs = performance.now();
+            if (!(index && !middle && !ring && !pinky)) { zMotionBuffer = []; return null; }
+            zMotionBuffer.push({ x: lm[8].x, t: nowMs });
+            zMotionBuffer = zMotionBuffer.filter(p => nowMs - p.t <= 900);
+            if (zMotionBuffer.length < 6) return null;
+            let reversals = 0, dir = 0;
+            for (let i = 1; i < zMotionBuffer.length; i++) {
+                const d = zMotionBuffer[i].x - zMotionBuffer[i - 1].x;
+                if (Math.abs(d) < 0.004) continue;
+                const nd = d > 0 ? 1 : -1;
+                if (dir !== 0 && nd !== dir) reversals++;
+                dir = nd;
+            }
+            if (reversals >= 2) return { key: 'Z', conf: 0.55 };
+            return null;
+        }
+
+        // ---------- MEDIAPIPE SETUP ----------
+        function drawLandmarks(landmarksList) {
+            overlay.width = overlay.clientWidth;
+            overlay.height = overlay.clientHeight;
+            octx.clearRect(0, 0, overlay.width, overlay.height);
+            const CONNECTIONS = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10], [10, 11], [11, 12],
+            [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [17, 18], [18, 19], [19, 20], [0, 17]];
+            landmarksList.forEach(lm => {
+                octx.strokeStyle = 'rgba(18,138,244,0.9)';
+                octx.lineWidth = 2;
+                CONNECTIONS.forEach(([a, b]) => {
+                    octx.beginPath();
+                    octx.moveTo(lm[a].x * overlay.width, lm[a].y * overlay.height);
+                    octx.lineTo(lm[b].x * overlay.width, lm[b].y * overlay.height);
+                    octx.stroke();
+                });
+                lm.forEach(pt => {
+                    octx.fillStyle = '#063DAD';
+                    octx.beginPath();
+                    octx.arc(pt.x * overlay.width, pt.y * overlay.height, 3, 0, Math.PI * 2);
+                    octx.fill();
+                });
+            });
+        }
+
+        function onResults(results) {
+            fpsFrames++;
+            const now = performance.now();
+            if (now - fpsLast > 1000) {
+                const fps = Math.round(fpsFrames * 1000 / (now - fpsLast));
+                fpsCounter.textContent = fps + ' FPS';
+                fpsFrames = 0; fpsLast = now;
+            }
+
+            const numHands = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+            handsBadge.textContent = numHands + (numHands === 1 ? ' hand' : ' hands');
+
+            if (numHands === 0) {
+                drawLandmarks([]);
+                confBar.style.width = '0%';
+                confVal.textContent = '0%';
+                gestureBadge.textContent = '—';
+                return;
+            }
+
+            drawLandmarks(results.multiHandLandmarks);
+
+            const mode = document.getElementById('mode-select').value;
+            if (mode === 'paused') return;
+
+            if (appMode === 'alphabet') {
+                onResultsAlphabet(results);
+            } else {
+                onResultsWords(results);
+            }
+        }
+
+        function onResultsWords(results) {
+            if (detectionEngine === 'server') {
+                onResultsWordsServer(results);
+                return;
+            }
+            if (detectionEngine === 'custom') {
+                onResultsWordsCustom(results);
+                return;
+            }
+            let best = null;
+            if (results.multiHandLandmarks.length === 2) {
+                best = classifyTwoHand(results.multiHandLandmarks[0], results.multiHandLandmarks[1]);
+            }
+            if (!best) {
+                results.multiHandLandmarks.forEach(lm => {
+                    const g = classifyGesture(lm);
+                    if (g && (!best || g.conf > best.conf)) best = g;
+                });
+            }
+            const waveHit = trackWave(results.multiHandLandmarks);
+            if (waveHit && (!best || waveHit.conf > best.conf)) best = waveHit;
+
+            const nowMs = performance.now();
+            if (best) {
+                candidateBuffer.push({ key: best.key, conf: best.conf, t: nowMs });
+            }
+            candidateBuffer = candidateBuffer.filter(c => nowMs - c.t <= HOLD_MS);
+
+            const confirmed = confirmCandidate(candidateBuffer, nowMs, HOLD_MS);
+
+            if (confirmed) {
+                confBar.style.width = Math.round(confirmed.conf * 100) + '%';
+                confVal.textContent = Math.round(confirmed.conf * 100) + '%';
+                const word = GESTURE_WORDS[confirmed.key];
+                gestureBadge.textContent = word;
+
+                const nowT = Date.now();
+                if (word !== lastSpokenWord || nowT - lastSpokenTime > 1800) {
+                    lastSpokenWord = word;
+                    lastSpokenTime = nowT;
+                    addWord(word);
+                    speak(word);
+                    logDetection(word, confirmed.conf);
+                    candidateBuffer = [];
+                    armSentenceTimer();
+                }
+            } else if (best) {
+                confBar.style.width = Math.round(best.conf * 100) + '%';
+                confVal.textContent = 'holding…';
+                gestureBadge.textContent = GESTURE_WORDS[best.key] + '?';
+            } else {
+                confBar.style.width = '15%';
+                confVal.textContent = '—';
+                gestureBadge.textContent = 'No match';
+            }
+        }
+
+        async function onResultsWordsServer(results) {
+            const lm = results.multiHandLandmarks[0];
+            const prediction = await backendPredict(lm);
+
+            const nowMs = performance.now();
+            if (prediction) {
+                candidateBuffer.push({ key: prediction.key, conf: prediction.conf, t: nowMs });
+            }
+            candidateBuffer = candidateBuffer.filter(c => nowMs - c.t <= HOLD_MS);
+
+            const confirmed = confirmCandidate(candidateBuffer, nowMs, HOLD_MS);
+
+            if (confirmed) {
+                confBar.style.width = Math.round(confirmed.conf * 100) + '%';
+                confVal.textContent = Math.round(confirmed.conf * 100) + '%';
+                const word = confirmed.key;
+                gestureBadge.textContent = word;
+
+                const nowT = Date.now();
+                if (word !== lastSpokenWord || nowT - lastSpokenTime > 1800) {
+                    lastSpokenWord = word;
+                    lastSpokenTime = nowT;
+                    addWord(word);
+                    speak(word);
+                    logDetection(word, confirmed.conf);
+                    candidateBuffer = [];
+                    armSentenceTimer();
+                }
+            } else if (prediction) {
+                confBar.style.width = Math.round(prediction.conf * 100) + '%';
+                confVal.textContent = 'holding…';
+                gestureBadge.textContent = prediction.key + '?';
+            } else {
+                confBar.style.width = '15%';
+                confVal.textContent = '—';
+                gestureBadge.textContent = 'No match';
+            }
+        }
+
+        // Custom-model path: identical hold-to-confirm / speak / transcript pipeline,
+        // but "best" comes from the TensorFlow.js model imported via Model & Engine.
+        async function onResultsWordsCustom(results) {
+            const lm = results.multiHandLandmarks[0];
+            const prediction = await customModelPredict(lm);
+
+            const nowMs = performance.now();
+            if (prediction) {
+                candidateBuffer.push({ key: prediction.key, conf: prediction.conf, t: nowMs });
+            }
+            candidateBuffer = candidateBuffer.filter(c => nowMs - c.t <= HOLD_MS);
+
+            const confirmed = confirmCandidate(candidateBuffer, nowMs, HOLD_MS);
+
+            if (confirmed) {
+                confBar.style.width = Math.round(confirmed.conf * 100) + '%';
+                confVal.textContent = Math.round(confirmed.conf * 100) + '%';
+                const word = confirmed.key;
+                gestureBadge.textContent = word;
+
+                const nowT = Date.now();
+                if (word !== lastSpokenWord || nowT - lastSpokenTime > 1800) {
+                    lastSpokenWord = word;
+                    lastSpokenTime = nowT;
+                    addWord(word);
+                    speak(word);
+                    logDetection(word, confirmed.conf);
+                    candidateBuffer = [];
+                    armSentenceTimer();
+                }
+            } else if (prediction) {
+                confBar.style.width = Math.round(prediction.conf * 100) + '%';
+                confVal.textContent = 'holding…';
+                gestureBadge.textContent = prediction.key + '?';
+            } else if (!customModel) {
+                confBar.style.width = '15%';
+                confVal.textContent = '—';
+                gestureBadge.textContent = 'No model loaded';
+            } else {
+                confBar.style.width = '15%';
+                confVal.textContent = '—';
+                gestureBadge.textContent = 'No match';
+            }
+        }
+
+        function onResultsAlphabet(results) {
+            const lm = results.multiHandLandmarks[0];
+            let best = classifyAlphabet(lm);
+
+            const jHit = trackJ(results.multiHandLandmarks);
+            if (jHit && (!best || jHit.conf > best.conf)) best = jHit;
+            const zHit = trackZ(results.multiHandLandmarks);
+            if (zHit && (!best || zHit.conf > best.conf)) best = zHit;
+
+            const nowMs = performance.now();
+            if (best) {
+                alphaBuffer.push({ key: best.key, conf: best.conf, t: nowMs });
+            }
+            alphaBuffer = alphaBuffer.filter(c => nowMs - c.t <= ALPHA_HOLD_MS);
+
+            const confirmed = confirmCandidate(alphaBuffer, nowMs, ALPHA_HOLD_MS);
+
+            if (confirmed) {
+                confBar.style.width = Math.round(confirmed.conf * 100) + '%';
+                confVal.textContent = Math.round(confirmed.conf * 100) + '%';
+                const letter = confirmed.key;
+                gestureBadge.textContent = letter;
+
+                const nowT = Date.now();
+                if (letter !== lastSpokenLetter || nowT - lastSpokenLetterTime > 1500) {
+                    lastSpokenLetter = letter;
+                    lastSpokenLetterTime = nowT;
+                    addLetter(letter);
+                    speak(letter);
+                    logDetection(letter, confirmed.conf);
+                    alphaBuffer = [];
+                    armLetterLineTimer();
+                }
+            } else if (best) {
+                confBar.style.width = Math.round(best.conf * 100) + '%';
+                confVal.textContent = 'holding…';
+                gestureBadge.textContent = best.key + '?';
+            } else {
+                confBar.style.width = '15%';
+                confVal.textContent = '—';
+                gestureBadge.textContent = 'No match';
+            }
+        }
+
+        function confirmCandidate(buffer, nowMs, holdMs) {
+            if (buffer.length === 0) return null;
+            const span = nowMs - buffer[0].t;
+            if (span < holdMs * 0.7) return null;
+            const counts = {};
+            buffer.forEach(c => counts[c.key] = (counts[c.key] || 0) + 1);
+            const [topKey, topCount] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+            if (topCount / buffer.length < MIN_AGREEMENT) return null;
+            const avgConf = buffer.filter(c => c.key === topKey).reduce((s, c) => s + c.conf, 0) / topCount;
+            return { key: topKey, conf: avgConf };
+        }
+
+        function trackWave(handsLm) {
+            if (!handsLm || handsLm.length === 0) { waveBuffer = []; return null; }
+            const lm = handsLm[0];
+            const idx = fingerExtended(lm, 8, 6, 5), mid = fingerExtended(lm, 12, 10, 9);
+            const rng = fingerExtended(lm, 16, 14, 13), pnk = fingerExtended(lm, 20, 18, 17);
+            const open = [idx, mid, rng, pnk].filter(Boolean).length === 4;
+            const nowMs = performance.now();
+            if (!open) { waveBuffer = waveBuffer.filter(p => nowMs - p.t <= WAVE_WINDOW_MS); return null; }
+            waveBuffer.push({ x: lm[0].x, t: nowMs });
+            waveBuffer = waveBuffer.filter(p => nowMs - p.t <= WAVE_WINDOW_MS);
+            if (waveBuffer.length < 6) return null;
+            let reversals = 0, dir = 0;
+            for (let i = 1; i < waveBuffer.length; i++) {
+                const d = waveBuffer[i].x - waveBuffer[i - 1].x;
+                if (Math.abs(d) < 0.004) continue;
+                const nd = d > 0 ? 1 : -1;
+                if (dir !== 0 && nd !== dir) reversals++;
+                dir = nd;
+            }
+            if (reversals >= 2) return { key: 'bye', conf: 0.7 };
+            return null;
+        }
+
+        function armSentenceTimer() {
+            lastWordTime = Date.now();
+            if (sentenceTimer) clearTimeout(sentenceTimer);
+            sentenceTimer = setTimeout(() => {
+                if (Date.now() - lastWordTime >= SENTENCE_PAUSE_MS - 50) finalizeSentence();
+            }, SENTENCE_PAUSE_MS);
+        }
+        function finalizeSentence() {
+            if (sentence.length === 0) return;
+            const naturalText = toNaturalSentence(sentence);
+            const entry = { gloss: sentence.slice(), text: naturalText, time: new Date() };
+            conversationLog.unshift(entry);
+            saveConversationToFirebase(entry, 'words');
+            sentence = [];
+            renderSentence();
+            renderConversationLog();
+            renderDashboard();
+            if (speakOnDetect && 'speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const u = new SpeechSynthesisUtterance(naturalText);
+                const sel = document.getElementById('voice-select');
+                if (voices[sel.value]) u.voice = voices[sel.value];
+                u.rate = parseFloat(document.getElementById('rate-range').value);
+                u.volume = parseFloat(document.getElementById('vol-range').value);
+                window.speechSynthesis.speak(u);
+            }
+        }
+        function renderConversationLog() {
+            const wrap = document.getElementById('conversation-wrap-full');
+            if (wrap) {
+                if (conversationLog.length === 0) {
+                    wrap.innerHTML = '<div class="hist-empty">Finished sentences will appear here after a short pause between signs.</div>';
+                } else {
+                    wrap.innerHTML = conversationLog.map(c => `
+        <div class="convo-line">
+          <div class="convo-text">${escapeHtml(c.text)}</div>
+          <div class="convo-meta">${c.gloss.join(' · ')} — ${c.time.toLocaleTimeString()}</div>
+        </div>`).join('');
+                }
+            }
+        }
+
+        async function startCamera() {
+            document.getElementById('start-cam').textContent = 'Starting…';
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacing } });
+                videoEl.srcObject = stream;
+                await videoEl.play();
+            } catch (err) {
+                stageEmpty.innerHTML = `<span style="font-size:28px;">⚠️</span><p style="max-width:260px;margin:0;">Camera access was blocked or unavailable: ${err.message}. Check your browser's camera permission for this page.</p>`;
+                return;
+            }
+            stageEmpty.style.display = 'none';
+            hud.style.display = 'flex';
+            liveDot.classList.add('live');
+            document.getElementById('sb-cam-dot').classList.add('on');
+            document.getElementById('sb-cam-text').textContent = 'Camera live';
+
+            if (!hands) {
+                hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+                hands.setOptions({
+                    maxNumHands: 2,
+                    modelComplexity: 1,
+                    minDetectionConfidence: 0.6,
+                    minTrackingConfidence: 0.5
+                });
+                hands.onResults(onResults);
+            }
+
+            camera = new Camera(videoEl, {
+                onFrame: async () => { await hands.send({ image: videoEl }); },
+                width: 640, height: 480
+            });
+            camera.start();
+        }
+
+        document.getElementById('start-cam').onclick = startCamera;
+        document.getElementById('stop-cam').onclick = () => {
+            if (camera) { camera.stop(); camera = null; }
+            const stream = videoEl.srcObject;
+            if (stream) { stream.getTracks().forEach(t => t.stop()); }
+            videoEl.srcObject = null;
+            stageEmpty.style.display = 'flex';
+            stageEmpty.innerHTML = `<span style="font-size:28px;">✋</span><p style="max-width:260px;margin:0;">Camera stopped. Re-enable to keep signing.</p><button id="start-cam-2">Enable camera</button>`;
+            document.getElementById('start-cam-2').onclick = startCamera;
+            hud.style.display = 'none';
+            liveDot.classList.remove('live');
+            document.getElementById('sb-cam-dot').classList.remove('on');
+            document.getElementById('sb-cam-text').textContent = 'Camera off';
+            octx.clearRect(0, 0, overlay.width, overlay.height);
+        };
+        document.getElementById('switch-cam').onclick = async () => {
+            currentFacing = currentFacing === 'user' ? 'environment' : 'user';
+            if (videoEl.srcObject) {
+                const stream = videoEl.srcObject;
+                stream.getTracks().forEach(t => t.stop());
+                if (camera) camera.stop();
+                await startCamera();
+            }
+        };
+
+        initFirebase();
+        loadFirebaseHistory();
+        loadFirebaseConversations();
+        renderSentence();
+        renderAlphabet();
+        renderDashboard();
+    </script>
+</body>
+
+</html>

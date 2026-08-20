@@ -939,7 +939,7 @@ async function backendPredict(handLandmarks){
       body: JSON.stringify({ landmarks })
     });
     const data = await res.json();
-    if(data.error || !data.label) return null;
+    if(data.error || !data.label || data.matched === false) return null;
     return { key: data.label, conf: data.confidence };
   }catch(err){
     return null;

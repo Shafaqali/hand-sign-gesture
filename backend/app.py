@@ -38,6 +38,8 @@ BASE_DIR = os.path.dirname(__file__)
 FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
 MODEL_PATH = os.path.join(BASE_DIR, "model", "gesture_model.h5")
 LABELS_PATH = os.path.join(BASE_DIR, "model", "labels.json")
+METADATA_PATH = os.path.join(BASE_DIR, "model", "training_metadata.json")
+MIN_CONFIDENCE = float(os.environ.get("PREDICT_MIN_CONFIDENCE", "0.55"))
 
 app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")
 CORS(app)
@@ -71,10 +73,19 @@ def index():
 @app.route("/api/health")
 def health():
     loaded = load_model_if_available()
+    metadata = {}
+    if os.path.exists(METADATA_PATH):
+        try:
+            with open(METADATA_PATH) as f:
+                metadata = json.load(f)
+        except Exception:
+            metadata = {}
     return jsonify({
         "status": "ok",
         "model_loaded": loaded,
         "gestures": _labels if loaded else [],
+        "min_confidence": MIN_CONFIDENCE,
+        "training_metadata": metadata,
     })
 
 
@@ -98,9 +109,11 @@ def predict():
         features = normalize_landmarks(landmarks).reshape(1, -1)
         preds = _model.predict(features, verbose=0)[0]
         best_idx = int(preds.argmax())
+        confidence = float(preds[best_idx])
         return jsonify({
             "label": _labels[best_idx],
-            "confidence": float(preds[best_idx]),
+            "confidence": confidence,
+            "matched": confidence >= MIN_CONFIDENCE,
             "all_scores": {
                 _labels[i]: float(p) for i, p in enumerate(preds)
             },
