@@ -2079,6 +2079,7 @@
         const backendUrlInput = document.getElementById('backend-url-input');
         if (backendUrlInput) {
             backendUrlInput.placeholder = BACKEND_URL || 'same origin';
+            backendUrlInput.value = BACKEND_URL;
         }
         let detectionEngine = 'browser';   // 'browser' | 'server' | 'custom'
         let backendGestures = [];
@@ -2127,15 +2128,25 @@
             loadCustomModelFromUrl(url, labels);
         };
 
-        async function customModelPredict(handLandmarks) {
+        function flattenHandsForModel(handsLandmarks) {
+            const hands = (handsLandmarks || []).slice(0, 2);
+            hands.sort((a, b) => (a[0]?.x || 0) - (b[0]?.x || 0));
+            const flat = [];
+            hands.forEach(hand => {
+                hand.forEach(p => flat.push(p.x, p.y, p.z || 0));
+            });
+            while (flat.length < 126) flat.push(0);
+            return flat.slice(0, 126);
+        }
+
+        async function customModelPredict(handsLandmarks) {
             if (!customModel || customModelBusy) return null;
             const now = performance.now();
             if (now - lastCustomCallAt < CUSTOM_THROTTLE_MS) return null;
             lastCustomCallAt = now;
             customModelBusy = true;
             try {
-                const flat = [];
-                handLandmarks.forEach(p => { flat.push(p.x, p.y, p.z || 0); });
+                const flat = flattenHandsForModel(handsLandmarks);
                 const input = tf.tensor2d([flat]);
                 const out = customModel.predict(input);
                 const data = await out.data();
@@ -2348,9 +2359,34 @@
                 setText('Backend not reachable — start it with "python app.py". Using browser engine.', 'var(--muted)');
             }
         }
+        async function checkBackendHealthPretty() {
+            const statusEl = document.getElementById('engine-status');
+            const statusEl2 = document.getElementById('engine-status-2');
+            const setText = (t, c) => {
+                statusEl.textContent = t;
+                statusEl.style.color = c;
+                if (statusEl2) {
+                    statusEl2.textContent = t;
+                    statusEl2.style.color = c;
+                }
+            };
+            const urlLabel = BACKEND_URL || 'same origin';
+            try {
+                const res = await fetch(`${BACKEND_URL}/api/health`);
+                const data = await res.json();
+                if (data.model_loaded) {
+                    backendGestures = data.gestures || [];
+                    setText(`Server model ready (${urlLabel}) - knows: ${backendGestures.join(', ')}`, '#128AF4');
+                } else {
+                    setText(`Server reachable (${urlLabel}) but no trained model found. If this is Render, redeploy latest commit.`, 'var(--coral)');
+                }
+            } catch (err) {
+                setText(`Backend not reachable (${urlLabel}). Using browser engine.`, 'var(--muted)');
+            }
+        }
         document.getElementById('check-backend-btn').onclick = () => {
             BACKEND_URL = resolveBackendUrl(document.getElementById('backend-url-input').value);
-            checkBackendHealth();
+            checkBackendHealthPretty();
         };
 
         async function backendPredict(handsLandmarks) {
@@ -2386,13 +2422,13 @@
                         : '<span class="status-pill"><span class="d"></span>Custom model (URL)</span>';
             candidateBuffer = [];
             alphaBuffer = [];
-            if (name === 'server') checkBackendHealth();
+            if (name === 'server') checkBackendHealthPretty();
         }
         document.getElementById('engine-select').addEventListener('change', (e) => setEngine(e.target.value));
         document.querySelectorAll('.engine-opt').forEach(opt => {
             opt.addEventListener('click', () => setEngine(opt.dataset.engine));
         });
-        checkBackendHealth();
+        checkBackendHealthPretty();
 
         let sentence = [];
         let history = [];
@@ -3120,8 +3156,7 @@
         // Custom-model path: identical hold-to-confirm / speak / transcript pipeline,
         // but "best" comes from the TensorFlow.js model imported via Model & Engine.
         async function onResultsWordsCustom(results) {
-            const lm = results.multiHandLandmarks[0];
-            const prediction = await customModelPredict(lm);
+            const prediction = await customModelPredict(results.multiHandLandmarks);
 
             const nowMs = performance.now();
             if (prediction) {
