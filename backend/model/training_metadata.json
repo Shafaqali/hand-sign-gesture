@@ -1,102 +1,152 @@
 {
-  "trained_at": "2026-08-20T14:44:26.156289+00:00",
+  "trained_at": "2026-08-24T16:04:12.594770+00:00",
   "csv_path": "C:\\Users\\kashaf\\Downloads\\signspeak-ai\\signspeak-ai\\backend\\data\\landmarks.csv",
   "input_features": 126,
   "max_hands": 2,
   "labels": [
     "bathroom",
+    "brother",
     "bye",
     "call me",
     "come",
     "drink",
     "eat",
+    "family",
+    "father",
     "friend",
     "give",
     "go",
+    "good",
     "hello",
+    "help",
     "home",
+    "learn",
     "love",
+    "money",
+    "mother",
+    "name",
     "no",
     "ok",
     "please",
     "rock on",
     "school",
+    "sister",
     "sleep",
     "sorry",
     "stop",
     "thank you",
+    "today",
+    "together",
+    "tomorrow",
     "wait",
-    "work",
+    "water",
+    "what",
+    "where",
     "yes",
+    "yesterday",
     "you"
   ],
   "sample_counts": {
-    "bathroom": 177,
-    "bye": 182,
-    "call me": 159,
-    "come": 165,
-    "drink": 169,
-    "eat": 186,
+    "bathroom": 155,
+    "brother": 155,
+    "bye": 163,
+    "call me": 153,
+    "come": 161,
+    "drink": 156,
+    "eat": 152,
+    "family": 156,
+    "father": 152,
     "friend": 153,
-    "give": 167,
-    "go": 188,
-    "hello": 155,
-    "home": 181,
-    "love": 160,
-    "no": 160,
-    "ok": 166,
-    "please": 165,
-    "rock on": 182,
-    "school": 195,
-    "sleep": 188,
-    "sorry": 151,
-    "stop": 169,
-    "thank you": 186,
-    "wait": 154,
-    "work": 163,
-    "yes": 170,
-    "you": 203
+    "give": 153,
+    "go": 153,
+    "good": 153,
+    "hello": 154,
+    "help": 152,
+    "home": 152,
+    "learn": 162,
+    "love": 152,
+    "money": 165,
+    "mother": 153,
+    "name": 154,
+    "no": 155,
+    "ok": 153,
+    "please": 153,
+    "rock on": 159,
+    "school": 150,
+    "sister": 153,
+    "sleep": 153,
+    "sorry": 152,
+    "stop": 159,
+    "thank you": 163,
+    "today": 163,
+    "together": 150,
+    "tomorrow": 159,
+    "wait": 152,
+    "water": 153,
+    "what": 176,
+    "where": 153,
+    "yes": 153,
+    "yesterday": 150,
+    "you": 153
   },
-  "validation_accuracy": 1.0,
-  "validation_loss": 0.0018145841313526034,
-  "epochs_ran": 54,
+  "validation_accuracy": 0.9945098161697388,
+  "validation_loss": 0.026228584349155426,
+  "epochs_ran": 64,
   "recommended_samples_per_class": 150,
   "classification_report": {
     "bathroom": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 35.0
+      "support": 31.0
+    },
+    "brother": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 31.0
     },
     "bye": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 36.0
+      "support": 33.0
     },
     "call me": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 32.0
+      "support": 30.0
     },
     "come": {
       "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 33.0
+      "recall": 0.9375,
+      "f1-score": 0.967741935483871,
+      "support": 32.0
     },
     "drink": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 34.0
+      "support": 31.0
     },
     "eat": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 37.0
+      "support": 30.0
+    },
+    "family": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 31.0
+    },
+    "father": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 30.0
     },
     "friend": {
       "precision": 1.0,
@@ -108,13 +158,19 @@
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 33.0
+      "support": 31.0
     },
     "go": {
+      "precision": 0.9393939393939394,
+      "recall": 1.0,
+      "f1-score": 0.96875,
+      "support": 31.0
+    },
+    "good": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 38.0
+      "support": 31.0
     },
     "hello": {
       "precision": 1.0,
@@ -122,53 +178,89 @@
       "f1-score": 1.0,
       "support": 31.0
     },
+    "help": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 30.0
+    },
     "home": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 36.0
+      "support": 30.0
+    },
+    "learn": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 32.0
     },
     "love": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 32.0
+      "support": 30.0
+    },
+    "money": {
+      "precision": 1.0,
+      "recall": 0.9696969696969697,
+      "f1-score": 0.9846153846153847,
+      "support": 33.0
+    },
+    "mother": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 31.0
+    },
+    "name": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 31.0
     },
     "no": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 32.0
+      "support": 31.0
     },
     "ok": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 33.0
+      "support": 30.0
     },
     "please": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 33.0
+      "support": 31.0
     },
     "rock on": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 36.0
+      "support": 32.0
     },
     "school": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 39.0
+      "support": 30.0
+    },
+    "sister": {
+      "precision": 0.9666666666666667,
+      "recall": 0.9666666666666667,
+      "f1-score": 0.9666666666666667,
+      "support": 30.0
     },
     "sleep": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 38.0
+      "support": 31.0
     },
     "sorry": {
       "precision": 1.0,
@@ -178,52 +270,88 @@
     },
     "stop": {
       "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 34.0
+      "recall": 0.9375,
+      "f1-score": 0.967741935483871,
+      "support": 32.0
     },
     "thank you": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 37.0
+      "support": 33.0
+    },
+    "today": {
+      "precision": 0.9696969696969697,
+      "recall": 0.9696969696969697,
+      "f1-score": 0.9696969696969697,
+      "support": 33.0
+    },
+    "together": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 30.0
+    },
+    "tomorrow": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 32.0
     },
     "wait": {
+      "precision": 0.9375,
+      "recall": 1.0,
+      "f1-score": 0.967741935483871,
+      "support": 30.0
+    },
+    "water": {
+      "precision": 0.96875,
+      "recall": 1.0,
+      "f1-score": 0.9841269841269841,
+      "support": 31.0
+    },
+    "what": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 35.0
+    },
+    "where": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
       "support": 31.0
     },
-    "work": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 33.0
-    },
     "yes": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 34.0
+      "support": 31.0
+    },
+    "yesterday": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 30.0
     },
     "you": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 41.0
+      "support": 31.0
     },
-    "accuracy": 1.0,
+    "accuracy": 0.9945098039215686,
     "macro avg": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 859.0
+      "precision": 0.9946831116038433,
+      "recall": 0.994660014781966,
+      "f1-score": 0.9945629710136006,
+      "support": 1275.0
     },
     "weighted avg": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 859.0
+      "precision": 0.9947274212715388,
+      "recall": 0.9945098039215686,
+      "f1-score": 0.9945092048123357,
+      "support": 1275.0
     }
   }
 }
