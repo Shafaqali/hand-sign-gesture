@@ -1897,8 +1897,22 @@
         const GESTURE_WORDS = {
             hello: "Hello", stop: "Stop", yes: "Yes", no: "No",
             come: "Come", good: "Good", friend: "Friend", sorry: "Sorry",
-            love: "Love", ok: "Ok", help: "Help", together: "Together", bye: "Bye"
+            love: "Love", ok: "Ok", help: "Help", together: "Together", bye: "Bye",
+            bathroom: "Bathroom", brother: "Brother", "call me": "Call me",
+            drink: "Drink", eat: "Eat", family: "Family", father: "Father",
+            give: "Give", go: "Go", home: "Home", learn: "Learn",
+            money: "Money", mother: "Mother", name: "Name", please: "Please",
+            "rock on": "Rock on", school: "School", sister: "Sister",
+            sleep: "Sleep", "thank you": "Thank you", today: "Today",
+            tomorrow: "Tomorrow", wait: "Wait", water: "Water", what: "What",
+            where: "Where", yesterday: "Yesterday", you: "You"
         };
+        function displayWord(label) {
+            if (!label) return "";
+            const clean = String(label).trim();
+            const key = clean.toLowerCase();
+            return GESTURE_WORDS[key] || clean.replace(/\b\w/g, ch => ch.toUpperCase());
+        }
         const TRANSLATIONS = {
             Hello: { hi: "नमस्ते", mr: "नमस्कार", gu: "નમસ્તે", ur: "ہیلو" },
             Stop: { hi: "रुको", mr: "थांबा", gu: "રોકો", ur: "رک جاؤ" },
@@ -1922,7 +1936,17 @@
             "friend+love+together": "I love being together with you, my friend.",
             "good+help+yes": "Yes, that help was really good.",
             "bye+friend+hello": "Hello and goodbye, my friend!",
-            "friend+sorry+together": "I'm sorry, my friend -- let's stay together."
+            "friend+sorry+together": "I'm sorry, my friend -- let's stay together.",
+            "father+hello+mother": "Hello mother and father.",
+            "brother+family+sister": "My brother and sister are my family.",
+            "father+home+mother": "Mother and father are at home.",
+            "please+water+you": "Can you please give me water?",
+            "learn+school+today": "Today I am learning at school.",
+            "thank you+you+help": "Thank you for helping me.",
+            "bathroom+please+where": "Where is the bathroom, please?",
+            "go+home+today": "I am going home today.",
+            "drink+eat+water": "I want to eat and drink water.",
+            "family+love+together": "I love my family being together."
         };
         const PAIR_PHRASES = {
             "friend+hello": "Hello, my friend!",
@@ -1948,7 +1972,46 @@
             "good+hello": "Hello! It's good to see you.",
             "no+ok": "No, that's not okay.",
             "friend+ok": "Okay, my friend.",
-            "friend+stop": "Stop it, my friend."
+            "friend+stop": "Stop it, my friend.",
+            "father+hello": "Hello, father.",
+            "mother+hello": "Hello, mother.",
+            "brother+hello": "Hello, brother.",
+            "sister+hello": "Hello, sister.",
+            "family+hello": "Hello, family.",
+            "family+love": "I love my family.",
+            "family+together": "My family is together.",
+            "father+mother": "My mother and father.",
+            "brother+sister": "My brother and sister.",
+            "go+home": "I am going home.",
+            "home+where": "Where is home?",
+            "go+school": "I am going to school.",
+            "learn+school": "I am learning at school.",
+            "thank you+you": "Thank you.",
+            "please+help": "Please help me.",
+            "please+water": "Water, please.",
+            "food+please": "Food, please.",
+            "please+bathroom": "Bathroom, please.",
+            "help+you": "You can help me.",
+            "name+you": "What is your name?",
+            "name+what": "What is your name?",
+            "what+you": "What do you mean?",
+            "where+you": "Where are you?",
+            "where+bathroom": "Where is the bathroom?",
+            "where+school": "Where is the school?",
+            "where+home": "Where is home?",
+            "drink+water": "I want to drink water.",
+            "eat+food": "I want to eat food.",
+            "give+money": "Please give me money.",
+            "call me+you": "Please call me.",
+            "today+school": "Today I have school.",
+            "tomorrow+school": "Tomorrow I have school.",
+            "yesterday+school": "Yesterday I went to school.",
+            "today+home": "Today I am at home.",
+            "wait+please": "Please wait.",
+            "sleep+home": "I will sleep at home.",
+            "bye+father": "Goodbye, father.",
+            "bye+mother": "Goodbye, mother.",
+            "bye+family": "Goodbye, family."
         };
         const REPEAT_TEXT = {
             Yes: "Yes, yes -- absolutely!",
@@ -1956,13 +2019,30 @@
             Good: "Good, so good!",
             Stop: "Stop, stop right now!",
             Help: "Help! I really need help!",
-            Love: "I love you, I really do."
+            Love: "I love you, I really do.",
+            Please: "Please, please.",
+            Wait: "Wait, please wait.",
+            You: "You, yes you.",
+            Water: "Water, I need water.",
+            Home: "Home, I want to go home."
         };
         const WORD_TEMPLATE = {
             Hello: "Hello!", Stop: "Stop.", Yes: "Yes.", No: "No.",
             Come: "Please come here.", Good: "That's good.", Friend: "You are my friend.",
             Sorry: "I'm sorry.", Love: "I love you.", Ok: "Okay.", Help: "I need help.",
-            Together: "Let's stay together.", Bye: "Goodbye!"
+            Together: "Let's stay together.", Bye: "Goodbye!",
+            Bathroom: "I need to use the bathroom.", Brother: "This is my brother.",
+            "Call me": "Please call me.", Drink: "I want to drink.",
+            Eat: "I want to eat.", Family: "This is my family.",
+            Father: "This is my father.", Give: "Please give it to me.",
+            Go: "I am going.", Home: "I am going home.", Learn: "I am learning.",
+            Money: "I need money.", Mother: "This is my mother.",
+            Name: "My name.", Please: "Please.", "Rock on": "Rock on!",
+            School: "I am going to school.", Sister: "This is my sister.",
+            Sleep: "I want to sleep.", "Thank you": "Thank you.",
+            Today: "Today.", Tomorrow: "Tomorrow.", Wait: "Please wait.",
+            Water: "I need water.", What: "What?", Where: "Where?",
+            Yesterday: "Yesterday.", You: "You."
         };
 
         function sortedKey(arr) { return arr.map(w => w.toLowerCase()).sort().join('+'); }
@@ -2553,7 +2633,9 @@
             document.getElementById('dash-mode-text').textContent = appMode === 'words' ? 'Word signs' : 'Alphabet';
         }
         function addWord(word) {
-            sentence.push(word);
+            const normalized = displayWord(word);
+            if (!normalized) return;
+            sentence.push(normalized);
             renderSentence();
         }
         document.getElementById('undo-btn').onclick = () => { sentence.pop(); renderSentence(); };
@@ -3133,7 +3215,7 @@
             if (confirmed) {
                 confBar.style.width = Math.round(confirmed.conf * 100) + '%';
                 confVal.textContent = Math.round(confirmed.conf * 100) + '%';
-                const word = confirmed.key;
+                const word = displayWord(confirmed.key);
                 gestureBadge.textContent = word;
 
                 const nowT = Date.now();
@@ -3149,7 +3231,7 @@
             } else if (prediction) {
                 confBar.style.width = Math.round(prediction.conf * 100) + '%';
                 confVal.textContent = 'holding…';
-                gestureBadge.textContent = prediction.key + '?';
+                gestureBadge.textContent = displayWord(prediction.key) + '?';
             } else {
                 confBar.style.width = '15%';
                 confVal.textContent = '—';
@@ -3173,7 +3255,7 @@
             if (confirmed) {
                 confBar.style.width = Math.round(confirmed.conf * 100) + '%';
                 confVal.textContent = Math.round(confirmed.conf * 100) + '%';
-                const word = confirmed.key;
+                const word = displayWord(confirmed.key);
                 gestureBadge.textContent = word;
 
                 const nowT = Date.now();
@@ -3189,7 +3271,7 @@
             } else if (prediction) {
                 confBar.style.width = Math.round(prediction.conf * 100) + '%';
                 confVal.textContent = 'holding…';
-                gestureBadge.textContent = prediction.key + '?';
+                gestureBadge.textContent = displayWord(prediction.key) + '?';
             } else if (!customModel) {
                 confBar.style.width = '15%';
                 confVal.textContent = '—';
