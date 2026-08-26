@@ -99,6 +99,42 @@ Example idea:
 
 This mode works immediately because it does not need a trained TensorFlow model.
 
+## Alphabet Fingerspelling Mode
+
+Alphabet mode builds words from confirmed letter gestures. When you sign letters with a short pause between words, the frontend formats the final text into readable words:
+
+```text
+T H E  -> The
+H O M E -> Home
+H E L L O  W O R L D -> Hello World
+```
+
+The browser rule model currently recognizes these alphabet gestures:
+
+| Letter | Gesture shape |
+| --- | --- |
+| A | Closed fist, thumb resting on the side of the hand. |
+| B | Four fingers straight up together, thumb folded across the palm. |
+| C | Curved open hand shaped like the letter C. |
+| D | Index finger straight up, other fingers folded, thumb near the folded middle finger. |
+| E | Compact folded fingers with the thumb across the fingertips. Best-effort browser rule. |
+| F | Thumb and index fingertip touching, other three fingers up. |
+| H | Index and middle fingers together and pointing sideways. Best-effort browser rule. |
+| I | Pinky finger up, other fingers folded. |
+| J | Start from I and trace a J motion with the pinky. |
+| L | Index finger up and thumb out, making an L shape. |
+| O | Fingers and thumb curved into an O loop. |
+| S | Closed fist with thumb wrapped across the front of the fingers. |
+| T | Closed fist with thumb tucked between index and middle finger. Best-effort browser rule. |
+| U | Index and middle fingers straight up together. |
+| V | Index and middle fingers straight up and spread apart. |
+| W | Index, middle, and ring fingers straight up. |
+| X | Index finger bent like a hook, other fingers folded. |
+| Y | Thumb and pinky out, middle fingers folded. |
+| Z | Point with index finger and trace a Z motion. |
+
+The simple browser rules still do not reliably detect G, K, M, N, P, Q, and R because those letters need fine thumb/finger overlap or wrist rotation. For those, use Server AI mode and train the TensorFlow model with your own samples.
+
 ### 5. Server AI mode sends landmarks to Flask
 
 In Server AI mode, the frontend does not directly decide the final sign. Instead, it sends the hand landmarks to Flask.

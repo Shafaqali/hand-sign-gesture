@@ -1111,17 +1111,31 @@ document.getElementById('copy-btn').onclick = () => {
 };
 
 // ---------- ALPHABET (FINGERSPELLING) BUILDER ----------
+function formatFingerspelledWord(word){
+  const cleaned = word.replace(/[^A-Za-z']/g, '');
+  if(!cleaned) return '';
+  const lower = cleaned.toLowerCase();
+  if(lower === 'i') return 'I';
+  if(lower === 'im') return "I'm";
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+function formatFingerspelledText(raw){
+  return raw.trim().split(/\s+/).map(formatFingerspelledWord).filter(Boolean).join(' ');
+}
 function renderAlphabet(){
   const box = document.getElementById('alphabet-box');
   const letters = spellText.replace(/ /g, '').length;
+  const hint = document.getElementById('alpha-hint');
   document.getElementById('letter-count').textContent = letters + (letters===1?' letter':' letters');
   if(!spellText){
     box.innerHTML = '<span class="placeholder">Fingerspelled letters will appear here — hold each letter steady for a moment…</span>';
+    if(hint) hint.textContent = 'Word preview appears here after letters are detected.';
     return;
   }
   box.innerHTML = spellText.split('').map(ch => ch === ' '
     ? '&nbsp;&nbsp;'
     : `<span class="word-chip">${ch}</span>`).join('');
+  if(hint) hint.textContent = `Word preview: ${formatFingerspelledText(spellText)}`;
 }
 function addLetter(letter){
   const nowT = Date.now();
@@ -1143,9 +1157,10 @@ function armLetterLineTimer(){
   }, SENTENCE_PAUSE_MS);
 }
 function finalizeSpelling(){
-  const text = spellText.trim();
+  const rawText = spellText.trim();
+  const text = formatFingerspelledText(rawText);
   if(!text) return;
-  const entry = { gloss: text.split(' '), text: text, time: new Date() };
+  const entry = { gloss: rawText.split(/\s+/), text: text, time: new Date() };
   conversationLog.unshift(entry);
   saveConversationToFirebase(entry, 'alphabet');
   spellText = '';
@@ -1175,7 +1190,7 @@ document.getElementById('clear-alpha-btn').onclick = () => {
   renderAlphabet();
 };
 document.getElementById('copy-alpha-btn').onclick = () => {
-  navigator.clipboard.writeText(spellText.trim()).catch(()=>{});
+  navigator.clipboard.writeText(formatFingerspelledText(spellText)).catch(()=>{});
   const btn = document.getElementById('copy-alpha-btn');
   const old = btn.textContent; btn.textContent = 'Copied ✓';
   setTimeout(()=>btn.textContent = old, 1200);
@@ -1384,10 +1399,10 @@ function classifyTwoHand(lmA, lmB){
 
 // ---------- ALPHABET (FINGERSPELLING) CLASSIFIER ----------
 // Same idea as classifyGesture: pure geometry over the 21 hand landmarks,
-// no trained model. Covers 16 of 26 ASL letters — the ones distinguishable
+// no trained model. Covers 19 of 26 ASL letters - the ones distinguishable
 // from a single 2D-ish snapshot of finger-extension + thumb position. Letters
-// that hinge on wrist rotation or fine thumb overlap (E, G, H, K, M, N, P, Q,
-// R, T) are intentionally left out rather than guessed at unreliably.
+// that hinge on wrist rotation or fine thumb overlap (G, K, M, N, P, Q, R) are
+// intentionally left out rather than guessed at unreliably.
 function extRatio(lm, tip, pip){
   return dist(lm[tip], lm[0]) / dist(lm[pip], lm[0]);
 }
@@ -1400,6 +1415,7 @@ function classifyAlphabet(lm){
 
   const thumbTipToIndexTip = dist(lm[4], lm[8]);
   const thumbTipToMiddleTip = dist(lm[4], lm[12]);
+  const thumbTipToIndexMCP = dist(lm[4], lm[5]);
   const thumbTipToMiddleMCP = dist(lm[4], lm[9]);
   const thumbTipToPinkyMCP = dist(lm[4], lm[17]);
   const thumbAcrossPalm = thumbTipToMiddleMCP < 0.075; // thumb tucked over the front of curled/flat fingers
@@ -1439,6 +1455,10 @@ function classifyAlphabet(lm){
   // -- V vs U: index + middle up, distinguished by how spread apart they are
   if(index && middle && !ring && !pinky){
     const spread = dist(lm[8], lm[12]);
+    const pairHorizontal = Math.abs(lm[8].y - lm[12].y) < 0.04 && Math.abs(lm[8].x - lm[5].x) > Math.abs(lm[8].y - lm[5].y) * 1.1;
+    if(spread <= 0.09 && pairHorizontal){
+      return {key:'H', conf:0.58};
+    }
     return spread > 0.085 ? {key:'V', conf:0.72} : {key:'U', conf:0.68};
   }
   // -- B: all four fingers up together, thumb folded across the palm
@@ -1448,6 +1468,14 @@ function classifyAlphabet(lm){
   // Remaining shapes all have zero extended fingers — distinguish by how
   // curled the hand is and where the thumb sits.
   if(extendedCount === 0){
+    const compactFist = curlSpan <= 0.23;
+    const thumbBetweenIndexMiddle = thumbTipToIndexMCP < 0.12 && thumbTipToMiddleMCP < 0.11 && thumbTipToIndexTip > 0.075;
+    if(compactFist && thumbBetweenIndexMiddle){
+      return {key:'T', conf:0.57};
+    }
+    if(compactFist && thumbAcrossPalm && thumbTipToIndexTip < 0.12 && thumbTipToMiddleTip < 0.12){
+      return {key:'E', conf:0.56};
+    }
     // -- O: fingers curved (not clenched) with thumb tip near the curled index tip, forming a loop
     if(curlSpan > 0.23 && thumbTipToIndexTip < 0.10){
       return {key:'O', conf:0.6};

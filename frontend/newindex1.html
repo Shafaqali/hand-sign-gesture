@@ -1814,8 +1814,8 @@
                                 including two-hand compounds and one motion-tracked sign (Bye).</p>
                         </div>
                         <div class="feature-card"><span class="fic">🔤</span>
-                            <h4>16 alphabet letters</h4>
-                            <p>A, B, C, D, F, I, J, L, O, S, U, V, W, X, Y, Z fingerspelling, with hold-time
+                            <h4>19 alphabet letters</h4>
+                            <p>A, B, C, D, E, F, H, I, J, L, O, S, T, U, V, W, X, Y, Z fingerspelling, with hold-time
                                 confirmation and auto-spacing between words.</p>
                         </div>
                         <div class="feature-card"><span class="fic">🗣</span>
@@ -1845,16 +1845,15 @@
                         feeding two independent rule-based geometric classifiers. <b>Word signs</b> mode recognizes 13
                         whole-word signs — including two-hand compounds (Help, Together) and one motion-tracked sign
                         (Bye, via wrist-trajectory wave detection) — and turns a run of them into a punctuated sentence
-                        through a phrase-template engine. <b>Alphabet</b> mode fingerspells 16 ASL letters (A, B, C, D,
-                        F, I, J, L, O, S, U, V, W, X, Y, Z) from static handshapes plus two motion-traced letters (J,
+                        through a phrase-template engine. <b>Alphabet</b> mode fingerspells 19 ASL letters (A, B, C, D,
+                        E, F, H, I, J, L, O, S, T, U, V, W, X, Y, Z) from static handshapes plus two motion-traced letters (J,
                         Z), with a hold-time + rolling-buffer confirmation layer so a shape has to be held steadily
                         before it registers, auto-spacing between words on a short pause, and line finalization into the
                         Conversation log on a longer pause. Both modes share Web Speech API TTS, detection history, CSV
                         export, and a fixed-vocabulary translation table.<br><br>
                         <b>What's simplified:</b> both built-in modes are geometry-over-landmarks classifiers, not
                         trained models — they recognize curated, clearly distinct handshapes rather than general
-                        ASL/ISL. Alphabet mode only covers 16 of the 26 letters; E, G, H, K, M, N, P, Q, R, and T are
-                        left out because they depend on fine thumb/finger overlap or wrist rotation that's unreliable to
+                        ASL/ISL. Alphabet mode leaves out G, K, M, N, P, Q, and R because they depend on fine thumb/finger overlap or wrist rotation that's unreliable to
                         detect from 2D landmarks with simple geometric rules. J and Z rely on a coarse
                         fingertip-trajectory heuristic, not real motion-sequence modelling, so they're the least
                         reliable letters. The "natural sentence" text in Word signs mode is a hand-written phrase table
@@ -2653,17 +2652,31 @@
         };
 
         // ---------- ALPHABET (FINGERSPELLING) BUILDER ----------
+        function formatFingerspelledWord(word) {
+            const cleaned = word.replace(/[^A-Za-z']/g, '');
+            if (!cleaned) return '';
+            const lower = cleaned.toLowerCase();
+            if (lower === 'i') return 'I';
+            if (lower === 'im') return "I'm";
+            return lower.charAt(0).toUpperCase() + lower.slice(1);
+        }
+        function formatFingerspelledText(raw) {
+            return raw.trim().split(/\s+/).map(formatFingerspelledWord).filter(Boolean).join(' ');
+        }
         function renderAlphabet() {
             const box = document.getElementById('alphabet-box');
             const letters = spellText.replace(/ /g, '').length;
+            const hint = document.getElementById('alpha-hint');
             document.getElementById('letter-count').textContent = letters + (letters === 1 ? ' letter' : ' letters');
             if (!spellText) {
                 box.innerHTML = '<span class="placeholder">Fingerspelled letters will appear here — hold each letter steady for a moment…</span>';
+                if (hint) hint.textContent = 'Word preview appears here after letters are detected.';
                 return;
             }
             box.innerHTML = spellText.split('').map(ch => ch === ' '
                 ? '&nbsp;&nbsp;'
                 : `<span class="word-chip">${ch}</span>`).join('');
+            if (hint) hint.textContent = `Word preview: ${formatFingerspelledText(spellText)}`;
         }
         function addLetter(letter) {
             const nowT = Date.now();
@@ -2682,9 +2695,10 @@
             }, SENTENCE_PAUSE_MS);
         }
         function finalizeSpelling() {
-            const text = spellText.trim();
+            const rawText = spellText.trim();
+            const text = formatFingerspelledText(rawText);
             if (!text) return;
-            const entry = { gloss: text.split(' '), text: text, time: new Date() };
+            const entry = { gloss: rawText.split(/\s+/), text: text, time: new Date() };
             conversationLog.unshift(entry);
             saveConversationToFirebase(entry, 'alphabet');
             spellText = '';
@@ -2714,7 +2728,7 @@
             renderAlphabet();
         };
         document.getElementById('copy-alpha-btn').onclick = () => {
-            navigator.clipboard.writeText(spellText.trim()).catch(() => { });
+            navigator.clipboard.writeText(formatFingerspelledText(spellText)).catch(() => { });
             const btn = document.getElementById('copy-alpha-btn');
             const old = btn.textContent; btn.textContent = 'Copied ✓';
             setTimeout(() => btn.textContent = old, 1200);
@@ -2992,6 +3006,7 @@
 
             const thumbTipToIndexTip = dist(lm[4], lm[8]);
             const thumbTipToMiddleTip = dist(lm[4], lm[12]);
+            const thumbTipToIndexMCP = dist(lm[4], lm[5]);
             const thumbTipToMiddleMCP = dist(lm[4], lm[9]);
             const thumbTipToPinkyMCP = dist(lm[4], lm[17]);
             const thumbAcrossPalm = thumbTipToMiddleMCP < 0.075;
@@ -3023,12 +3038,24 @@
             }
             if (index && middle && !ring && !pinky) {
                 const spread = dist(lm[8], lm[12]);
+                const pairHorizontal = Math.abs(lm[8].y - lm[12].y) < 0.04 && Math.abs(lm[8].x - lm[5].x) > Math.abs(lm[8].y - lm[5].y) * 1.1;
+                if (spread <= 0.09 && pairHorizontal) {
+                    return { key: 'H', conf: 0.58 };
+                }
                 return spread > 0.085 ? { key: 'V', conf: 0.72 } : { key: 'U', conf: 0.68 };
             }
             if (extendedCount === 4 && thumbAcrossPalm) {
                 return { key: 'B', conf: 0.68 };
             }
             if (extendedCount === 0) {
+                const compactFist = curlSpan <= 0.23;
+                const thumbBetweenIndexMiddle = thumbTipToIndexMCP < 0.12 && thumbTipToMiddleMCP < 0.11 && thumbTipToIndexTip > 0.075;
+                if (compactFist && thumbBetweenIndexMiddle) {
+                    return { key: 'T', conf: 0.57 };
+                }
+                if (compactFist && thumbAcrossPalm && thumbTipToIndexTip < 0.12 && thumbTipToMiddleTip < 0.12) {
+                    return { key: 'E', conf: 0.56 };
+                }
                 if (curlSpan > 0.23 && thumbTipToIndexTip < 0.10) {
                     return { key: 'O', conf: 0.6 };
                 }
