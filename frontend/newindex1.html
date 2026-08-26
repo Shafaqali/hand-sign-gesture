@@ -1814,8 +1814,8 @@
                                 including two-hand compounds and one motion-tracked sign (Bye).</p>
                         </div>
                         <div class="feature-card"><span class="fic">🔤</span>
-                            <h4>19 alphabet letters</h4>
-                            <p>A, B, C, D, E, F, H, I, J, L, O, S, T, U, V, W, X, Y, Z fingerspelling, with hold-time
+                            <h4>26 alphabet letters</h4>
+                            <p>A-Z fingerspelling, with hold-time
                                 confirmation and auto-spacing between words.</p>
                         </div>
                         <div class="feature-card"><span class="fic">🗣</span>
@@ -1845,16 +1845,15 @@
                         feeding two independent rule-based geometric classifiers. <b>Word signs</b> mode recognizes 13
                         whole-word signs — including two-hand compounds (Help, Together) and one motion-tracked sign
                         (Bye, via wrist-trajectory wave detection) — and turns a run of them into a punctuated sentence
-                        through a phrase-template engine. <b>Alphabet</b> mode fingerspells 19 ASL letters (A, B, C, D,
-                        E, F, H, I, J, L, O, S, T, U, V, W, X, Y, Z) from static handshapes plus two motion-traced letters (J,
+                        through a phrase-template engine. <b>Alphabet</b> mode fingerspells A-Z from static handshapes plus two motion-traced letters (J,
                         Z), with a hold-time + rolling-buffer confirmation layer so a shape has to be held steadily
                         before it registers, auto-spacing between words on a short pause, and line finalization into the
                         Conversation log on a longer pause. Both modes share Web Speech API TTS, detection history, CSV
                         export, and a fixed-vocabulary translation table.<br><br>
                         <b>What's simplified:</b> both built-in modes are geometry-over-landmarks classifiers, not
                         trained models — they recognize curated, clearly distinct handshapes rather than general
-                        ASL/ISL. Alphabet mode leaves out G, K, M, N, P, Q, and R because they depend on fine thumb/finger overlap or wrist rotation that's unreliable to
-                        detect from 2D landmarks with simple geometric rules. J and Z rely on a coarse
+                        ASL/ISL. Fine-overlap letters such as G, K, M, N, P, Q, and R depend on thumb/finger overlap or wrist rotation, so they are less reliable in
+                        2D landmarks with simple geometric rules. J and Z rely on a coarse
                         fingertip-trajectory heuristic, not real motion-sequence modelling, so they're the least
                         reliable letters. The "natural sentence" text in Word signs mode is a hand-written phrase table
                         over 13 known signs, not grammar inference. The new <b>Model &amp; Engine</b> tab lets you swap
@@ -3008,16 +3007,26 @@
             const thumbTipToMiddleTip = dist(lm[4], lm[12]);
             const thumbTipToIndexMCP = dist(lm[4], lm[5]);
             const thumbTipToMiddleMCP = dist(lm[4], lm[9]);
+            const thumbTipToRingMCP = dist(lm[4], lm[13]);
             const thumbTipToPinkyMCP = dist(lm[4], lm[17]);
             const thumbAcrossPalm = thumbTipToMiddleMCP < 0.075;
             const thumbOutSide = thumbTipToPinkyMCP > 0.15;
             const curlSpan = dist(lm[8], lm[0]);
+            const indexHorizontal = Math.abs(lm[8].x - lm[5].x) > Math.abs(lm[8].y - lm[5].y) * 1.35;
+            const indexDown = lm[8].y > lm[5].y + 0.035;
+            const thumbIndexParallel = Math.abs(lm[4].y - lm[8].y) < 0.08 && thumbTipToIndexTip > 0.055 && thumbTipToIndexTip < 0.18;
 
             if (thumbTipToIndexTip < 0.055 && middle && ring && pinky) {
                 return { key: 'F', conf: 0.72 };
             }
             if (index && !middle && !ring && !pinky && thumbTipToMiddleTip < 0.08 && !thumbOutSide) {
                 return { key: 'D', conf: 0.7 };
+            }
+            if (index && !middle && !ring && !pinky && indexDown && thumbIndexParallel) {
+                return { key: 'Q', conf: 0.54 };
+            }
+            if (index && !middle && !ring && !pinky && indexHorizontal && thumbIndexParallel) {
+                return { key: 'G', conf: 0.55 };
             }
             if (index && !middle && !ring && !pinky && thumbOutSide) {
                 return { key: 'L', conf: 0.72 };
@@ -3039,6 +3048,18 @@
             if (index && middle && !ring && !pinky) {
                 const spread = dist(lm[8], lm[12]);
                 const pairHorizontal = Math.abs(lm[8].y - lm[12].y) < 0.04 && Math.abs(lm[8].x - lm[5].x) > Math.abs(lm[8].y - lm[5].y) * 1.1;
+                const crossedFingers = spread < 0.06 && Math.abs(lm[8].y - lm[12].y) < 0.07 && Math.sign(lm[8].x - lm[12].x) !== Math.sign(lm[5].x - lm[9].x);
+                const twoFingersDown = lm[8].y > lm[5].y + 0.035 && lm[12].y > lm[9].y + 0.035;
+                const thumbBetweenTwo = thumbTipToIndexMCP < 0.16 && thumbTipToMiddleMCP < 0.14 && thumbTipToIndexTip < 0.22 && thumbTipToMiddleTip < 0.22;
+                if (crossedFingers) {
+                    return { key: 'R', conf: 0.55 };
+                }
+                if (twoFingersDown && thumbBetweenTwo) {
+                    return { key: 'P', conf: 0.54 };
+                }
+                if (spread > 0.085 && thumbBetweenTwo) {
+                    return { key: 'K', conf: 0.55 };
+                }
                 if (spread <= 0.09 && pairHorizontal) {
                     return { key: 'H', conf: 0.58 };
                 }
@@ -3050,8 +3071,16 @@
             if (extendedCount === 0) {
                 const compactFist = curlSpan <= 0.23;
                 const thumbBetweenIndexMiddle = thumbTipToIndexMCP < 0.12 && thumbTipToMiddleMCP < 0.11 && thumbTipToIndexTip > 0.075;
+                const thumbUnderTwoFingers = thumbTipToMiddleMCP < 0.09 && thumbTipToRingMCP < 0.13 && thumbTipToPinkyMCP > 0.12;
+                const thumbUnderThreeFingers = thumbTipToRingMCP < 0.105 && thumbTipToPinkyMCP < 0.155 && thumbTipToIndexTip > 0.085;
                 if (compactFist && thumbBetweenIndexMiddle) {
                     return { key: 'T', conf: 0.57 };
+                }
+                if (compactFist && thumbUnderThreeFingers) {
+                    return { key: 'M', conf: 0.54 };
+                }
+                if (compactFist && thumbUnderTwoFingers) {
+                    return { key: 'N', conf: 0.54 };
                 }
                 if (compactFist && thumbAcrossPalm && thumbTipToIndexTip < 0.12 && thumbTipToMiddleTip < 0.12) {
                     return { key: 'E', conf: 0.56 };

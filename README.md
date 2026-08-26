@@ -109,7 +109,7 @@ H O M E -> Home
 H E L L O  W O R L D -> Hello World
 ```
 
-The browser rule model currently recognizes these alphabet gestures:
+The browser rule model recognizes these alphabet gestures:
 
 | Letter | Gesture shape |
 | --- | --- |
@@ -119,11 +119,18 @@ The browser rule model currently recognizes these alphabet gestures:
 | D | Index finger straight up, other fingers folded, thumb near the folded middle finger. |
 | E | Compact folded fingers with the thumb across the fingertips. Best-effort browser rule. |
 | F | Thumb and index fingertip touching, other three fingers up. |
+| G | Index finger and thumb held roughly parallel, pointing sideways. Best-effort browser rule. |
 | H | Index and middle fingers together and pointing sideways. Best-effort browser rule. |
 | I | Pinky finger up, other fingers folded. |
 | J | Start from I and trace a J motion with the pinky. |
+| K | Index and middle fingers up/spread, thumb held between them. Best-effort browser rule. |
 | L | Index finger up and thumb out, making an L shape. |
+| M | Closed fist with thumb tucked under three fingers. Best-effort browser rule. |
+| N | Closed fist with thumb tucked under two fingers. Best-effort browser rule. |
 | O | Fingers and thumb curved into an O loop. |
+| P | K handshape angled downward. Best-effort browser rule. |
+| Q | G handshape angled downward. Best-effort browser rule. |
+| R | Index and middle fingers crossed or very close together. Best-effort browser rule. |
 | S | Closed fist with thumb wrapped across the front of the fingers. |
 | T | Closed fist with thumb tucked between index and middle finger. Best-effort browser rule. |
 | U | Index and middle fingers straight up together. |
@@ -133,7 +140,7 @@ The browser rule model currently recognizes these alphabet gestures:
 | Y | Thumb and pinky out, middle fingers folded. |
 | Z | Point with index finger and trace a Z motion. |
 
-The simple browser rules still do not reliably detect G, K, M, N, P, Q, and R because those letters need fine thumb/finger overlap or wrist rotation. For those, use Server AI mode and train the TensorFlow model with your own samples.
+Letters like G, K, M, N, P, Q, and R are harder for a normal 2D webcam because they rely on wrist angle and thumb/finger overlap. The browser includes best-effort rules for them, but Server AI mode with your own trained TensorFlow samples will be more accurate.
 
 ### 5. Server AI mode sends landmarks to Flask
 

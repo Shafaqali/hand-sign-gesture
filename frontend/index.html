@@ -532,8 +532,8 @@
   </div>
 
   <div class="note">
-    <b>What's real here:</b> live MediaPipe hand-landmark tracking (21 points/hand, both hands) feeding two independent rule-based geometric classifiers. <b>Word signs</b> mode recognizes 13 whole-word signs — including two-hand compounds (Help, Together) and one motion-tracked sign (Bye, via wrist-trajectory wave detection) — and turns a run of them into a punctuated sentence through a phrase-template engine. <b>Alphabet</b> mode fingerspells 16 ASL letters (A, B, C, D, F, I, J, L, O, S, U, V, W, X, Y, Z) from static handshapes plus two motion-traced letters (J, Z), with a hold-time + rolling-buffer confirmation layer so a shape has to be held steadily before it registers, auto-spacing between words on a short pause, and line finalization into the Conversation log on a longer pause. Both modes share Web Speech API TTS, detection history, CSV export, and a fixed-vocabulary translation table.<br><br>
-    <b>What's simplified:</b> both modes are geometry-over-landmarks classifiers, not trained models — they recognize curated, clearly distinct handshapes rather than general ASL/ISL. Alphabet mode only covers 16 of the 26 letters; E, G, H, K, M, N, P, Q, R, and T are left out because they depend on fine thumb/finger overlap or wrist rotation that's unreliable to detect from 2D landmarks with simple geometric rules. J and Z rely on a coarse fingertip-trajectory heuristic (a handful of direction reversals in a short time window), not real motion-sequence modelling, so they'll be the least reliable letters. The "natural sentence" text in Word signs mode is a hand-written phrase table over 13 known signs, not grammar inference. Reliable, general sign-language recognition — the full alphabet, facial-grammar markers, body posture, and regional dialects — needs a trained deep-learning model on a labeled landmark dataset, which isn't something that can be fabricated without real training data. A production version would swap both classifiers for that trained model and add the FastAPI + MongoDB + JWT backend for accounts, cross-device history, and the admin panel — happy to scaffold that backend next if useful.
+    <b>What's real here:</b> live MediaPipe hand-landmark tracking (21 points/hand, both hands) feeding two independent rule-based geometric classifiers. <b>Word signs</b> mode recognizes 13 whole-word signs — including two-hand compounds (Help, Together) and one motion-tracked sign (Bye, via wrist-trajectory wave detection) — and turns a run of them into a punctuated sentence through a phrase-template engine. <b>Alphabet</b> mode fingerspells A-Z from static handshapes plus two motion-traced letters (J, Z), with a hold-time + rolling-buffer confirmation layer so a shape has to be held steadily before it registers, auto-spacing between words on a short pause, and line finalization into the Conversation log on a longer pause. Both modes share Web Speech API TTS, detection history, CSV export, and a fixed-vocabulary translation table.<br><br>
+    <b>What's simplified:</b> both modes are geometry-over-landmarks classifiers, not trained models — they recognize curated, clearly distinct handshapes rather than general ASL/ISL. Alphabet mode covers A-Z with best-effort geometry. Fine-overlap letters such as G, K, M, N, P, Q, and R are less reliable because they depend on thumb/finger overlap or wrist rotation that is hard to detect from 2D landmarks with simple geometric rules. J and Z rely on a coarse fingertip-trajectory heuristic (a handful of direction reversals in a short time window), not real motion-sequence modelling, so they'll be the least reliable letters. The "natural sentence" text in Word signs mode is a hand-written phrase table over 13 known signs, not grammar inference. Reliable, general sign-language recognition — the full alphabet, facial-grammar markers, body posture, and regional dialects — needs a trained deep-learning model on a labeled landmark dataset, which isn't something that can be fabricated without real training data. A production version would swap both classifiers for that trained model and add the FastAPI + MongoDB + JWT backend for accounts, cross-device history, and the admin panel — happy to scaffold that backend next if useful.
   </div>
 
 </div>
@@ -1399,10 +1399,8 @@ function classifyTwoHand(lmA, lmB){
 
 // ---------- ALPHABET (FINGERSPELLING) CLASSIFIER ----------
 // Same idea as classifyGesture: pure geometry over the 21 hand landmarks,
-// no trained model. Covers 19 of 26 ASL letters - the ones distinguishable
-// from a single 2D-ish snapshot of finger-extension + thumb position. Letters
-// that hinge on wrist rotation or fine thumb overlap (G, K, M, N, P, Q, R) are
-// intentionally left out rather than guessed at unreliably.
+// no trained model. Covers A-Z with best-effort geometry. Fine-overlap letters
+// such as G, K, M, N, P, Q, and R are less reliable than clearly distinct shapes.
 function extRatio(lm, tip, pip){
   return dist(lm[tip], lm[0]) / dist(lm[pip], lm[0]);
 }
@@ -1417,10 +1415,14 @@ function classifyAlphabet(lm){
   const thumbTipToMiddleTip = dist(lm[4], lm[12]);
   const thumbTipToIndexMCP = dist(lm[4], lm[5]);
   const thumbTipToMiddleMCP = dist(lm[4], lm[9]);
+  const thumbTipToRingMCP = dist(lm[4], lm[13]);
   const thumbTipToPinkyMCP = dist(lm[4], lm[17]);
   const thumbAcrossPalm = thumbTipToMiddleMCP < 0.075; // thumb tucked over the front of curled/flat fingers
   const thumbOutSide = thumbTipToPinkyMCP > 0.15; // thumb sticking out away from the fist, roughly perpendicular
   const curlSpan = dist(lm[8], lm[0]); // index tip to wrist — separates a tight fist from a loosely curved hand
+  const indexHorizontal = Math.abs(lm[8].x - lm[5].x) > Math.abs(lm[8].y - lm[5].y) * 1.35;
+  const indexDown = lm[8].y > lm[5].y + 0.035;
+  const thumbIndexParallel = Math.abs(lm[4].y - lm[8].y) < 0.08 && thumbTipToIndexTip > 0.055 && thumbTipToIndexTip < 0.18;
 
   // -- F: thumb & index tips pinched together, other three fingers extended
   if(thumbTipToIndexTip < 0.055 && middle && ring && pinky){
@@ -1429,6 +1431,14 @@ function classifyAlphabet(lm){
   // -- D: index up alone, thumb tip resting on the folded middle finger
   if(index && !middle && !ring && !pinky && thumbTipToMiddleTip < 0.08 && !thumbOutSide){
     return {key:'D', conf:0.7};
+  }
+  // -- Q: G handshape angled downward
+  if(index && !middle && !ring && !pinky && indexDown && thumbIndexParallel){
+    return {key:'Q', conf:0.54};
+  }
+  // -- G: index and thumb roughly parallel, pointing sideways
+  if(index && !middle && !ring && !pinky && indexHorizontal && thumbIndexParallel){
+    return {key:'G', conf:0.55};
   }
   // -- L: index up alone, thumb extended out wide (right angle)
   if(index && !middle && !ring && !pinky && thumbOutSide){
@@ -1456,6 +1466,18 @@ function classifyAlphabet(lm){
   if(index && middle && !ring && !pinky){
     const spread = dist(lm[8], lm[12]);
     const pairHorizontal = Math.abs(lm[8].y - lm[12].y) < 0.04 && Math.abs(lm[8].x - lm[5].x) > Math.abs(lm[8].y - lm[5].y) * 1.1;
+    const crossedFingers = spread < 0.06 && Math.abs(lm[8].y - lm[12].y) < 0.07 && Math.sign(lm[8].x - lm[12].x) !== Math.sign(lm[5].x - lm[9].x);
+    const twoFingersDown = lm[8].y > lm[5].y + 0.035 && lm[12].y > lm[9].y + 0.035;
+    const thumbBetweenTwo = thumbTipToIndexMCP < 0.16 && thumbTipToMiddleMCP < 0.14 && thumbTipToIndexTip < 0.22 && thumbTipToMiddleTip < 0.22;
+    if(crossedFingers){
+      return {key:'R', conf:0.55};
+    }
+    if(twoFingersDown && thumbBetweenTwo){
+      return {key:'P', conf:0.54};
+    }
+    if(spread > 0.085 && thumbBetweenTwo){
+      return {key:'K', conf:0.55};
+    }
     if(spread <= 0.09 && pairHorizontal){
       return {key:'H', conf:0.58};
     }
@@ -1470,8 +1492,16 @@ function classifyAlphabet(lm){
   if(extendedCount === 0){
     const compactFist = curlSpan <= 0.23;
     const thumbBetweenIndexMiddle = thumbTipToIndexMCP < 0.12 && thumbTipToMiddleMCP < 0.11 && thumbTipToIndexTip > 0.075;
+    const thumbUnderTwoFingers = thumbTipToMiddleMCP < 0.09 && thumbTipToRingMCP < 0.13 && thumbTipToPinkyMCP > 0.12;
+    const thumbUnderThreeFingers = thumbTipToRingMCP < 0.105 && thumbTipToPinkyMCP < 0.155 && thumbTipToIndexTip > 0.085;
     if(compactFist && thumbBetweenIndexMiddle){
       return {key:'T', conf:0.57};
+    }
+    if(compactFist && thumbUnderThreeFingers){
+      return {key:'M', conf:0.54};
+    }
+    if(compactFist && thumbUnderTwoFingers){
+      return {key:'N', conf:0.54};
     }
     if(compactFist && thumbAcrossPalm && thumbTipToIndexTip < 0.12 && thumbTipToMiddleTip < 0.12){
       return {key:'E', conf:0.56};
