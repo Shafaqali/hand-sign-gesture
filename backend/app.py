@@ -47,22 +47,32 @@ CORS(app)
 # ---- Lazy-load TensorFlow model (only if it exists) ----
 _model = None
 _labels = None
+_model_error = None
 
 
 def load_model_if_available():
-    global _model, _labels
+    global _model, _labels, _model_error
     if _model is not None:
         return True
     if not (os.path.exists(MODEL_PATH) and os.path.exists(LABELS_PATH)):
+        _model_error = "Model file or labels file is missing on the server."
         return False
-    # Imported here so the server still starts even if tensorflow isn't
-    # installed correctly, with a clear error only when prediction is used.
-    import tensorflow as tf
-    _model = tf.keras.models.load_model(MODEL_PATH)
-    with open(LABELS_PATH) as f:
-        _labels = json.load(f)
-    print(f"[SignSpeak AI] Loaded model with {len(_labels)} gestures: {_labels}")
-    return True
+    try:
+        # Imported here so the server still starts even if tensorflow isn't
+        # installed correctly, with a clear error only when prediction is used.
+        import tensorflow as tf
+        _model = tf.keras.models.load_model(MODEL_PATH, compile=False)
+        with open(LABELS_PATH) as f:
+            _labels = json.load(f)
+        _model_error = None
+        print(f"[SignSpeak AI] Loaded model with {len(_labels)} gestures: {_labels}")
+        return True
+    except Exception as exc:
+        _model = None
+        _labels = None
+        _model_error = str(exc)
+        print(f"[SignSpeak AI] Model load failed: {_model_error}")
+        return False
 
 
 @app.route("/")
@@ -84,6 +94,7 @@ def health():
         "status": "ok",
         "model_loaded": loaded,
         "gestures": _labels if loaded else [],
+        "model_error": _model_error,
         "min_confidence": MIN_CONFIDENCE,
         "training_metadata": metadata,
     })
@@ -94,7 +105,8 @@ def predict():
     if not load_model_if_available():
         return jsonify({
             "error": "No trained model found yet. Run collect_data.py then "
-                      "train_model.py in the backend folder first."
+                      "train_model.py in the backend folder first.",
+            "model_error": _model_error,
         }), 400
 
     data = request.get_json(silent=True)

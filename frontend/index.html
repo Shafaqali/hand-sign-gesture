@@ -920,7 +920,7 @@ async function checkBackendHealth(){
       statusEl.textContent = `Server model ready — knows: ${backendGestures.join(', ')}`;
       statusEl.style.color = '#128AF4';
     } else {
-      statusEl.textContent = 'Server reachable but no trained model yet (run collect_data.py + train_model.py).';
+      statusEl.textContent = 'Server reachable but no trained model yet. ' + (data.model_error || 'Run collect_data.py + train_model.py.');
       statusEl.style.color = 'var(--coral)';
     }
   }catch(err){

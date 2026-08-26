@@ -2148,9 +2148,29 @@
 
         // ---------- BACKEND (TensorFlow) ENGINE INTEGRATION ----------
         const RENDER_BACKEND_URL = 'https://hand-sign-gesture.onrender.com';
+        function isLocalBackendUrl(url) {
+            try {
+                const parsed = new URL(url, window.location.href);
+                return parsed.hostname === 'localhost'
+                    || parsed.hostname === '127.0.0.1'
+                    || parsed.hostname.startsWith('192.168.');
+            } catch (err) {
+                return false;
+            }
+        }
+        function isLocalFrontend() {
+            const host = window.location.hostname;
+            return window.location.protocol === 'file:'
+                || host === 'localhost'
+                || host === '127.0.0.1'
+                || host.startsWith('192.168.');
+        }
         function resolveBackendUrl(inputValue = '') {
             const manual = inputValue.trim().replace(/\/+$/, '');
-            if (manual) return manual;
+            if (manual) {
+                if (!isLocalFrontend() && isLocalBackendUrl(manual)) return '';
+                return manual;
+            }
             const host = window.location.hostname;
             if (window.location.protocol === 'file:') return 'http://127.0.0.1:5000';
             if (host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.')) return '';
@@ -2460,7 +2480,7 @@
                     backendGestures = data.gestures || [];
                     setText(`Server model ready (${urlLabel}) - knows: ${backendGestures.join(', ')}`, '#128AF4');
                 } else {
-                    setText(`Server reachable (${urlLabel}) but no trained model found. If this is Render, redeploy latest commit.`, 'var(--coral)');
+                    setText(`Server reachable (${urlLabel}) but no trained model found. ${data.model_error || 'If this is Render, redeploy latest commit.'}`, 'var(--coral)');
                 }
             } catch (err) {
                 setText(`Backend not reachable (${urlLabel}). Using browser engine.`, 'var(--muted)');
@@ -2468,6 +2488,10 @@
         }
         document.getElementById('check-backend-btn').onclick = () => {
             BACKEND_URL = resolveBackendUrl(document.getElementById('backend-url-input').value);
+            if (backendUrlInput) {
+                backendUrlInput.value = BACKEND_URL;
+                backendUrlInput.placeholder = BACKEND_URL || 'same origin';
+            }
             checkBackendHealthPretty();
         };
 
