@@ -40,6 +40,7 @@ backend/data/*
 backend/model/*
 !backend/model/.gitkeep
 !backend/model/gesture_model.h5
+!backend/model/gesture_model.npz
 !backend/model/labels.json
 !backend/model/training_metadata.json
 

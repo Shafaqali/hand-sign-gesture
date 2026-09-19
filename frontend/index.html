@@ -2900,6 +2900,17 @@
         let lastBackendCallAt = 0;
         const BACKEND_THROTTLE_MS = 350;
         let backendBusy = false;
+        const BACKEND_TIMEOUT_MS = 45000;
+
+        async function fetchWithTimeout(url, options = {}, timeoutMs = BACKEND_TIMEOUT_MS) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                return await fetch(url, { ...options, signal: controller.signal });
+            } finally {
+                clearTimeout(timer);
+            }
+        }
 
         // ---------- CUSTOM (ONLINE-IMPORTED) TFJS MODEL ----------
         let customModel = null;
@@ -3323,11 +3334,13 @@
             const statusEl2 = document.getElementById('engine-status-2');
             const setText = (t, c) => { statusEl.textContent = t; statusEl.style.color = c; if (statusEl2) { statusEl2.textContent = t; statusEl2.style.color = c; } };
             try {
-                const res = await fetch(`${BACKEND_URL}/api/health`);
+                const res = await fetchWithTimeout(`${BACKEND_URL}/api/health`, {}, 15000);
                 const data = await res.json();
-                if (data.model_loaded) {
-                    backendGestures = data.gestures || [];
-                    setText(`Server model ready — knows: ${backendGestures.join(', ')}`, '#128AF4');
+                const ready = data.model_loaded || data.model_ready;
+                if (ready) {
+                    backendGestures = data.gestures || data.training_metadata?.labels || [];
+                    const loadNote = data.model_loaded ? '' : ' (loads on first sign)';
+                    setText(`Server model ready${loadNote} — knows: ${backendGestures.join(', ')}`, '#128AF4');
                 } else {
                     setText('Server reachable but no trained model yet (run collect_data.py + train_model.py).', 'var(--coral)');
                 }
@@ -3348,11 +3361,13 @@
             };
             const urlLabel = BACKEND_URL || 'same origin';
             try {
-                const res = await fetch(`${BACKEND_URL}/api/health`);
+                const res = await fetchWithTimeout(`${BACKEND_URL}/api/health`, {}, 15000);
                 const data = await res.json();
-                if (data.model_loaded) {
-                    backendGestures = data.gestures || [];
-                    setText(`Server model ready (${urlLabel}) - knows: ${backendGestures.join(', ')}`, '#128AF4');
+                const ready = data.model_loaded || data.model_ready;
+                if (ready) {
+                    backendGestures = data.gestures || data.training_metadata?.labels || [];
+                    const loadNote = data.model_loaded ? 'ready' : 'ready, loads on first sign';
+                    setText(`Server model ${loadNote} (${urlLabel}) - knows: ${backendGestures.join(', ')}`, '#128AF4');
                 } else {
                     setText(`Server reachable (${urlLabel}) but no trained model found. ${data.model_error || 'If this is Render, redeploy latest commit.'}`, 'var(--coral)');
                 }
@@ -3376,16 +3391,23 @@
             lastBackendCallAt = now;
             backendBusy = true;
             try {
+                const statusEl = document.getElementById('engine-status');
+                if (statusEl) statusEl.textContent = 'Server AI warming up... first prediction can take 30-60 seconds on Render.';
                 const hands = (handsLandmarks || []).slice(0, 2).map(hand => hand.map(p => [p.x, p.y, p.z]));
-                const res = await fetch(`${BACKEND_URL}/api/predict`, {
+                const res = await fetchWithTimeout(`${BACKEND_URL}/api/predict`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ hands })
-                });
+                }, BACKEND_TIMEOUT_MS);
                 const data = await res.json();
+                if (statusEl && data.label) statusEl.textContent = `Server AI active - last: ${data.label} (${Math.round((data.confidence || 0) * 100)}%)`;
                 if (data.error || !data.label || data.matched === false) return null;
                 return { key: data.label, conf: data.confidence };
             } catch (err) {
+                const statusEl = document.getElementById('engine-status');
+                if (statusEl) statusEl.textContent = err.name === 'AbortError'
+                    ? 'Server AI timed out while loading. Wait a moment and try again, or use Browser engine.'
+                    : 'Server AI request failed. Check Render status or use Browser engine.';
                 return null;
             } finally {
                 backendBusy = false;

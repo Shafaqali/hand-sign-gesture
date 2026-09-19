@@ -1,1 +1,5 @@
--r backend/requirements.txt
+flask==3.0.3
+flask-cors==4.0.1
+numpy==1.26.4
+gTTS==2.5.1
+gunicorn==22.0.0
