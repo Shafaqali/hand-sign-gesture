@@ -50,6 +50,16 @@ _labels = None
 _model_error = None
 
 
+def model_files_status():
+    model_exists = os.path.exists(MODEL_PATH)
+    labels_exists = os.path.exists(LABELS_PATH)
+    return {
+        "model_file_exists": model_exists,
+        "labels_file_exists": labels_exists,
+        "model_ready": model_exists and labels_exists,
+    }
+
+
 def load_model_if_available():
     global _model, _labels, _model_error
     if _model is not None:
@@ -80,9 +90,13 @@ def index():
     return send_from_directory(FRONTEND_DIR, "index.html")
 
 
+@app.route("/<path:filename>")
+def frontend_file(filename):
+    return send_from_directory(FRONTEND_DIR, filename)
+
+
 @app.route("/api/health")
 def health():
-    loaded = load_model_if_available()
     metadata = {}
     if os.path.exists(METADATA_PATH):
         try:
@@ -90,10 +104,14 @@ def health():
                 metadata = json.load(f)
         except Exception:
             metadata = {}
+    file_status = model_files_status()
     return jsonify({
         "status": "ok",
-        "model_loaded": loaded,
-        "gestures": _labels if loaded else [],
+        "model_loaded": _model is not None,
+        "model_ready": file_status["model_ready"],
+        "model_file_exists": file_status["model_file_exists"],
+        "labels_file_exists": file_status["labels_file_exists"],
+        "gestures": _labels if _model is not None else [],
         "model_error": _model_error,
         "min_confidence": MIN_CONFIDENCE,
         "training_metadata": metadata,
